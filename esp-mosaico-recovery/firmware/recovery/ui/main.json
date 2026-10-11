@@ -602,7 +602,7 @@
       "shift_label": "SHIFT",
       "delete_label": "DELETE",
       "ok_label": "GO",
-      "symbols_label": "ABC",
+      "symbols_label": "123",
       "letters_label": "ABC",
       "space_label": "",
       "function_font_size": 20,

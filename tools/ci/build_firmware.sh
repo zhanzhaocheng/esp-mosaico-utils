@@ -90,7 +90,7 @@ report_recovery_size() {
     idf.py -C "$project" -B "$build" -D "SDKCONFIG=$build/sdkconfig" size \
         | tee "$build/size.txt"
     idf.py -C "$project" -B "$build" -D "SDKCONFIG=$build/sdkconfig" \
-        size-components --format json --output-file "$build/size-components.json"
+        size-components --format json2 --output-file "$build/size-components.json"
 }
 
 check_artifact_budgets() {

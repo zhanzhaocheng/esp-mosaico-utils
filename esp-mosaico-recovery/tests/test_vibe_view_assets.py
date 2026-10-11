@@ -1,5 +1,6 @@
 """Committed Vibe View outputs must match ui/main.json and cover every glyph it uses."""
 import importlib.util
+import json
 from pathlib import Path
 import struct
 import zlib
@@ -53,3 +54,16 @@ def test_scene_tables_regenerate_identically(tmp_path):
     # Glyph bitmaps, hence the CRC, may differ between FreeType releases.
     assert without_crc((tmp_path / "vibe_scene.c").read_text(encoding="utf-8")) == \
         without_crc((GENERATED / "vibe_scene.c").read_text(encoding="utf-8"))
+
+
+def test_keyboard_mode_key_names_the_page_it_opens():
+    def walk(items):
+        for item in items:
+            yield item
+            yield from walk(item.get("children", []))
+
+    keyboards = [item for item in walk(json.loads(SCENE.read_text(encoding="utf-8"))["objects"])
+                 if item.get("type") == "keyboard"]
+    assert keyboards
+    for keyboard in keyboards:
+        assert keyboard["symbols_label"] != keyboard["letters_label"], keyboard.get("id")

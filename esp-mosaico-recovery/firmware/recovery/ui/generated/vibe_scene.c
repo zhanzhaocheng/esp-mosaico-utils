@@ -57,6 +57,7 @@ static const char *const strings[] = {
     "SHIFT",
     "DELETE",
     "GO",
+    "123",
     "ABC",
 };
 
@@ -188,7 +189,7 @@ static const vv_template_def_t templates[] = {
 };
 
 static const vv_keyboard_def_t keyboards[] = {
-    {38, VIBE_ACT_PASSWORD_KEYBOARD_KEY, 0x0000, 0x52AB, 0xEF7E, 0x39E7, 0xEF7E, 0x39E7, 0xEF7E, 0x52AB, 0xEF7E, 0xFA60, 0xFFFF, 8, 2, 1, 0, 1, 52, 53, 54, 55, 55, 24}, /* password_keyboard */
+    {38, VIBE_ACT_PASSWORD_KEYBOARD_KEY, 0x0000, 0x52AB, 0xEF7E, 0x39E7, 0xEF7E, 0x39E7, 0xEF7E, 0x52AB, 0xEF7E, 0xFA60, 0xFFFF, 8, 2, 1, 0, 1, 52, 53, 54, 55, 56, 24}, /* password_keyboard */
 };
 
 static const uint16_t bind_objects[] = {
@@ -245,7 +246,7 @@ const vv_scene_t vibe_scene = {
     .list_count = 2, .lists = lists,
     .template_count = 2, .templates = templates,
     .keyboard_count = 1, .keyboards = keyboards,
-    .string_count = 56, .strings = strings,
+    .string_count = 57, .strings = strings,
     .bind_count = 44, .bind_objects = bind_objects,
     .assets_crc32 = 0x4821C5AFU,
 };
