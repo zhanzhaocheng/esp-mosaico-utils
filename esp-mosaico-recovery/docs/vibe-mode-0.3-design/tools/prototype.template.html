@@ -4,8 +4,9 @@
 @font-face { font-family: "VibeSans"; src: url(data:font/ttf;base64,__FONT_SANS__) format("truetype"); font-weight: 400; }
 @font-face { font-family: "VibeSans"; src: url(data:font/ttf;base64,__FONT_MEDIUM__) format("truetype"); font-weight: 500; }
 
-/* Layout: a device on the left (the subject), a quiet control column on the
-   right, all screens below. Single deliberate dark look: the device is black. */
+/* Layout: the device on the left (the subject), a quiet control column on the
+   right, all screens below. The page stays dark so the cream device and its
+   black screen read like the product photo. */
 :root {
   --page: #0a0a0a;
   --panel: #131313;
@@ -15,6 +16,9 @@
   --muted: #9a9a9a;
   --dim: #626262;
   --accent: #ff4c01;
+  --cream: #e9e2d6;
+  --cream-edge: #c4bbac;
+  --key-grey: #cfcac2;
   --body: "VibeSans", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
   --dots: "VibeDot", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
@@ -35,26 +39,31 @@ header.intro p { margin: 0; color: var(--muted); max-width: 68ch; }
 
 .device-col { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
 .device-fit { width: 100%; display: flex; justify-content: center; }
-.device-scale { width: 560px; height: 600px; position: relative; flex: none; transform-origin: top center; }
-.device { position: absolute; left: 16px; top: 36px; width: 528px; height: 528px; border-radius: 64px; background: #050505;
-  box-shadow: inset 0 0 0 2px #2c2c2c, 0 30px 80px rgba(0,0,0,.55); }
-.screen { position: absolute; left: 24px; top: 24px; width: 480px; height: 480px; border-radius: 26px; overflow: hidden; background: #000; isolation: isolate; }
-.hw { position: absolute; border: 0; cursor: pointer; padding: 0; font-family: var(--body); touch-action: none; }
+.device-scale { width: 560px; height: 616px; position: relative; flex: none; transform-origin: top center; }
+/* Cream body, black screen with large rounded corners (product photo). */
+.device { position: absolute; left: 16px; top: 44px; width: 528px; height: 528px; border-radius: 76px; background: var(--cream); z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--cream-edge), inset 0 -10px 24px rgba(0,0,0,.08), 0 30px 80px rgba(0,0,0,.55); }
+.screen { position: absolute; left: 24px; top: 24px; width: 480px; height: 480px; border-radius: 40px; overflow: hidden; background: #000; isolation: isolate;
+  box-shadow: 0 0 0 3px #1a1a1a; }
+/* Keys sit on the body edges: AI on the top edge at the right, two grey keys at the bottom. */
+.hw { position: absolute; border: 0; cursor: pointer; padding: 0; touch-action: none; z-index: 2; width: 92px; height: 24px; }
 .hw:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.hw.ai { left: 234px; top: 18px; width: 92px; height: 22px; border-radius: 11px 11px 4px 4px; background: #262626; color: var(--muted);
-  font-size: 11px; font-weight: 500; letter-spacing: .12em; }
-.hw.ai.on { background: var(--accent); color: #fff; }
-.hw.power { left: 420px; top: 560px; width: 70px; height: 18px; border-radius: 4px 4px 9px 9px; background: #262626; }
-.hw.power.on { background: #3a3a3a; }
+.hw.ai { left: 366px; top: 32px; border-radius: 9px 9px 5px 5px; background: var(--accent); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
+.hw.ai.on { background: #d63f00; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }
+.hw.side { left: 102px; top: 560px; border-radius: 5px 5px 9px 9px; background: var(--key-grey); box-shadow: inset 0 3px 0 rgba(0,0,0,.12); cursor: default; }
+.hw.power { left: 366px; top: 560px; border-radius: 5px 5px 9px 9px; background: var(--key-grey); box-shadow: inset 0 3px 0 rgba(0,0,0,.12); }
+.hw.power.on { background: #b3ada3; }
 .hw-label { position: absolute; font-size: 11px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
-.hw-label.ai { left: 236px; top: 0; width: 88px; text-align: center; }
-.hw-label.power { left: 400px; top: 580px; width: 110px; text-align: center; }
+.hw-label.ai { left: 352px; top: 8px; width: 120px; text-align: center; color: var(--accent); }
+.hw-label.power { left: 342px; top: 590px; width: 140px; text-align: center; }
 .keys-hint { color: var(--dim); font-size: 13px; text-align: center; max-width: 520px; }
 .keys-hint kbd { font-family: var(--body); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; color: var(--muted); }
 
-/* Screen objects: absolutely positioned GSP primitives from layout.json. */
+/* Screen objects: absolutely positioned GSP primitives from layout.json. Only
+   buttons take input, as in GSP; text, images and containers pass taps through. */
 .layer { position: absolute; inset: 0; }
 .o { position: absolute; margin: 0; padding: 0; border: 0; background: none; color: inherit; }
+.o:not(button) { pointer-events: none; }
 .o-text { display: flex; align-items: center; pointer-events: none; }
 .o-text span { white-space: pre; display: block; }
 button.o { cursor: pointer; font: inherit; }
@@ -63,7 +72,7 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
 .o img, img.o { display: block; image-rendering: auto; }
 .list { position: absolute; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
 .list::-webkit-scrollbar { display: none; }
-.row-hit { position: absolute; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 18px; }
+.row-hit { position: absolute; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 16px; }
 .kb-key { position: absolute; border: 0; padding: 0; cursor: pointer; font-family: var(--body); color: #f2f2f2; display: flex; align-items: center; justify-content: center; }
 .kb-key:active { filter: brightness(1.35); }
 
@@ -92,18 +101,19 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
 .thumb .mini .screen-static { position: absolute; left: 0; top: 0; width: 480px; height: 480px; transform: scale(.35); transform-origin: 0 0; }
 .thumb:hover .mini, .thumb:focus-visible .mini { box-shadow: 0 0 0 2px var(--accent); }
 .thumb:focus-visible { outline: none; }
-.static-bar { position: absolute; left: 50%; transform: translateX(-50%); top: 6px; z-index: 5; display: none; gap: 10px; align-items: center;
-  background: var(--accent); color: #fff; border-radius: 999px; padding: 4px 6px 4px 14px; font-size: 12px; white-space: nowrap; }
-.static-bar button { font: inherit; font-size: 12px; border: 0; border-radius: 999px; padding: 3px 10px; background: #fff; color: #000; cursor: pointer; }
-.static .static-bar { display: flex; }
+.static-bar { display: none; gap: 10px; align-items: center; max-width: 100%;
+  background: var(--accent); color: #fff; border-radius: 999px; padding: 4px 6px 4px 14px; font-size: 12px; }
+.static-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.static-bar button { font: inherit; font-size: 12px; border: 0; border-radius: 999px; padding: 3px 10px; background: #fff; color: #000; cursor: pointer; flex: none; }
+.static-bar.show { display: flex; }
 @media (prefers-reduced-motion: reduce) { .layer { transition: none !important; } }
 </style>
 
 <div class="wrap">
   <header class="intro">
-    <div class="eyebrow"><i></i>ESP-Mosaico · 阶段 A 界面设计评审</div>
+    <div class="eyebrow"><i></i>ESP-Mosaico · 阶段 A 界面设计评审 · 第 2 版</div>
     <h1>VIBE MODE 0.3</h1>
-    <p>可交互原型：按设备 480×480 屏幕绘制，与设计文档中的页面图使用同一份布局数据。所有数据都是示例；商店、Wi‑Fi 和 AI Agent 均为模拟，不连接真实服务。</p>
+    <p>可交互原型：按设备 480×480 屏幕绘制，与设计文档中的页面图使用同一份布局数据。所有数据都是示例；Mosaico Ideas 商店、Wi‑Fi、USB 和 AI Agent 均为模拟，不连接真实服务。</p>
   </header>
 
   <main class="stage">
@@ -111,16 +121,17 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
       <div class="device-fit" id="deviceFit">
         <div class="device-scale" id="deviceScale">
           <span class="hw-label ai">AI 键</span>
+          <button class="hw ai" id="aiKey" type="button" aria-label="AI 键：单击返回，双击快速切换，长按打开"></button>
           <div class="device" id="device">
             <div class="screen" id="screen" aria-live="polite"></div>
-            <div class="static-bar" id="staticBar"><span id="staticName">静态页面</span><button type="button" id="staticExit">返回可交互原型</button></div>
           </div>
-          <button class="hw ai" id="aiKey" type="button" aria-label="AI 键：单击返回，双击快速切换，长按打开">AI</button>
-          <button class="hw power" id="powerKey" type="button" aria-label="开关机键"></button>
+          <span class="hw side" aria-hidden="true"></span>
+          <button class="hw power" id="powerKey" type="button" aria-label="开关机键（底部右侧）"></button>
           <span class="hw-label power">开关机键</span>
         </div>
       </div>
-      <p class="keys-hint">触摸屏幕操作；点按顶部 <kbd>AI</kbd> 键或键盘 <kbd>↑</kbd>：单击返回 · 双击快速切换 · 长按 1 秒打开。添加页可直接键入数字。</p>
+      <div class="static-bar" id="staticBar"><span id="staticName">静态页面</span><button type="button" id="staticExit">返回可交互原型</button></div>
+      <p class="keys-hint">触摸屏幕操作；点按右上角橙色 <kbd>AI</kbd> 键或键盘 <kbd>↑</kbd>：单击返回 · 双击快速切换 · 长按 1 秒打开。下载页可直接键入数字。</p>
     </section>
 
     <aside class="panel">
@@ -128,9 +139,9 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
         <h2>AI 键</h2>
         <div class="legend">
           <div><span class="pill">AI</span><span>返回上一页；首页提示双击切换</span></div>
-          <div><span class="pill">AI ×2</span><span>呼出快速切换，再次双击换到下一个应用</span></div>
+          <div><span class="pill">AI ×2</span><span>快速切换当前列表（全部 / 收藏 / 分类）中的下一个应用</span></div>
           <div><span class="pill">长按 AI</span><span>在快速切换中打开选中的应用</span></div>
-          <div><span class="pill">按住 AI + 双击开关机</span><span>从正在运行的应用回到 Vibe Mode</span></div>
+          <div><span class="pill">按住 AI + 双击右下开关机键</span><span>从正在运行的应用回到 Vibe Mode</span></div>
         </div>
       </div>
       <div class="card">
@@ -141,6 +152,7 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
         <h2>模拟</h2>
         <div class="btns">
           <button type="button" id="simAgent" aria-pressed="true">AI Agent 已连接</button>
+          <button type="button" id="simUsb" aria-pressed="true">USB 数据线已插入</button>
           <button type="button" id="simDeploy">Agent 部署一个应用</button>
           <button type="button" id="simWifi" aria-pressed="true">Wi‑Fi 已连接</button>
           <button type="button" id="simGuide">首次进入（显示引导）</button>
@@ -153,7 +165,7 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
 
   <section class="gallery">
     <h2>全部页面</h2>
-    <p>设计文档中的 28 个页面状态。点开可在设备中查看静态页面，再点“返回可交互原型”继续操作。</p>
+    <p id="galleryNote">设计文档中的全部页面状态。点开可在设备中查看静态页面，再点“返回可交互原型”继续操作。</p>
     <div class="thumbs" id="thumbs"></div>
   </section>
 </div>
@@ -166,32 +178,30 @@ const ASSETS = __ASSETS__;
 const T = LAYOUT.tokens;
 const C = T.colors;
 const LH = T.line_height_em;
+const P = LAYOUT.prototype;
 const FAMILY = { dot: "VibeDot", sans: "VibeSans", medium: "VibeSans" };
 const WEIGHT = { dot: 400, sans: 400, medium: 500 };
 const STATES = {};
-for (const s of LAYOUT.states.concat(LAYOUT.prototype.states)) STATES[s.id] = s;
-const ROWS = LAYOUT.prototype.row_templates;
-const ROW_H = LAYOUT.prototype.row_heights;
+for (const s of LAYOUT.states.concat(P.states)) STATES[s.id] = s;
+const ROWS = P.row_templates;
+const ROW_H = P.row_heights;
+const CAT_LABEL = Object.fromEntries(P.categories.map((c) => [c.id, c.label]));
 const SLIDE = T.motion.page_slide_px, SLIDE_MS = T.motion.page_slide_ms;
 const DOUBLE_MS = 350, LONG_MS = 1000, TOAST_MS = 1500;
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const asset = (path) => ASSETS[path] || "";
 const iconPath = (name, size, color) => `assets/icons/${name}-${size}-${color}.png`;
+const catLabel = (id) => CAT_LABEL[id] || "Other";
 
 /* ---------------- Sample model (examples only) ---------------- */
-const STORE = {
-  "100001": { name: "Pixel Pet", version: "1.2.0", size: "1.8 MB", official: true },
-  "100002": { name: "Weather Station", version: "2.0.1", size: "2.4 MB", official: true },
-  "100005": { name: "Voice Notes", version: "1.0.0", size: "3.2 MB", official: true },
-  "238114": { name: "Retro Snake", version: "1.0.3", size: "0.9 MB", official: false },
-  "507219": { name: "Lo-fi Clock", version: "1.1.0", size: "1.2 MB", official: false },
-  "777001": { name: "Dice Roller", version: "2.1.0", size: "0.6 MB", official: false },
-};
+const STORE = {};
+for (const a of P.apps) STORE[a.id] = Object.assign(clone(a), P.store_updates[a.id] ? { version: P.store_updates[a.id] } : {});
+for (const a of P.store_only) STORE[a.id] = clone(a);
 const TRY_IDS = [
   ["238114", "社区应用，本机没有 → 下载"],
-  ["100005", "本机 v0.9.0，商店 v1.0.0 → 更新"],
-  ["100002", "本机已有最新版"],
+  ["100006", "本机 v1.0.0，商店 v1.1.0 → 更新"],
+  ["100009", "本机已有最新版"],
   ["404040", "编号不存在"],
   ["500500", "商店繁忙"],
   ["666666", "不兼容此设备"],
@@ -203,27 +213,32 @@ const NETWORKS = [
   { ssid: "Home-2.4G", secured: true, signal: "Weak" },
   { ssid: "Cafe Corner", secured: true, signal: "Weak" },
 ];
+const ENTRY = {
+  password: { limit: 64, placeholder: "Type the Wi-Fi password", note: " " },
+  city: { limit: 40, placeholder: "Type your city", note: "Apps use it for weather and local info." },
+  token: { limit: 128, placeholder: "Type your token", note: "Every app on this device can read it." },
+};
 function freshModel() {
   return {
-    apps: [
-      { id: "100001", name: "Pixel Pet", version: "1.2.0", size: "1.8 MB", official: true },
-      { id: "100002", name: "Weather Station", version: "2.0.1", size: "2.4 MB", official: true },
-      { id: "100005", name: "Voice Notes", version: "0.9.0", size: "3.1 MB", official: true },
-      { id: "507219", name: "Lo-fi Clock", version: "1.1.0", size: "1.2 MB", official: false },
-    ],
-    current: "100001",          // app installed in ota_0, if it is in the library
-    running: null,              // name of the app we "restarted" into
+    apps: clone(P.apps),
+    favorites: new Set(P.favorites),
+    current: P.current,         // app installed in ota_0, if it is in the library
+    filter: "all",              // all | favorites | a category id
+    running: null,
     agent: true,
+    usb: true,
     wifi: { connected: true, ssid: "Studio-5G", ip: "192.168.1.20" },
+    city: "Shanghai",
+    token: P.ai_token,
     guideDone: true,
-    add: { digits: "", status: "Enter the app ID", error: "" },
-    remote: null,               // app found in the store
+    dl: { digits: "", status: "Enter the app ID", error: "" },
     detail: null,               // { mode, app }
     deleteArmed: false,
     progress: null,
     result: null,
     pendingLookup: false,
-    password: { ssid: "", text: "", visible: false, error: "" },
+    password: { ssid: "" },
+    entry: { text: "", visible: false, error: "" },   // draft of the open keyboard page
     qs: null,                   // quick switch { index }
     scanning: false,
   };
@@ -251,7 +266,12 @@ function textNode(o, text, align, offset) {
   s.style.color = o.color;
   s.style.textAlign = align;
   if (offset) s.style.transform = `translateX(${offset}px)`;
-  if (o.overflow === "ellipsis") { s.style.overflow = "hidden"; s.style.textOverflow = "ellipsis"; s.style.maxWidth = "100%"; s.style.minWidth = "0"; }
+  if (o.wrap) {
+    s.style.whiteSpace = "normal"; s.style.display = "-webkit-box"; s.style.webkitBoxOrient = "vertical";
+    s.style.webkitLineClamp = String(Math.max(1, Math.floor(o.h / (LH[o.font] * o.size)))); s.style.overflow = "hidden";
+  } else if (o.overflow === "ellipsis") {
+    s.style.overflow = "hidden"; s.style.textOverflow = "ellipsis"; s.style.maxWidth = "100%"; s.style.minWidth = "0";
+  }
   return s;
 }
 
@@ -262,6 +282,7 @@ function renderObj(o, onAction, dx = 0, dy = 0) {
     n = document.createElement("img");
     n.src = asset(o.image);
     n.alt = "";
+    if (o.qr) n.style.imageRendering = "pixelated";
   } else if (interactive) {
     n = document.createElement("button");
     n.type = "button";
@@ -283,6 +304,7 @@ function renderObj(o, onAction, dx = 0, dy = 0) {
     if (holder !== n) { holder.style.position = "absolute"; holder.style.inset = "0"; n.appendChild(holder); }
     const align = o.type === "button" ? "center" : o.align;
     holder.style.justifyContent = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+    if (o.wrap) holder.style.alignItems = "flex-start";
     holder.appendChild(textNode(o, o.text, align, o.text_offset || 0));
   }
   if (o.type === "button" && o.icon) {
@@ -303,7 +325,7 @@ function renderObj(o, onAction, dx = 0, dy = 0) {
     f.dataset.fill = "1";
     n.appendChild(f);
   }
-  if (o.type === "keyboard") renderKeyboard(n, o, onAction);
+  if (o.type === "keyboard") { n.style.pointerEvents = "auto"; renderKeyboard(n, o, onAction); }
   return n;
 }
 
@@ -319,7 +341,7 @@ function renderKeyboard(n, kb, onAction) {
     b.className = "kb-key";
     b.style.left = px(x); b.style.top = px(y); b.style.width = px(w); b.style.height = px(keyH);
     b.style.background = color; b.style.borderRadius = px(kb.key_radius);
-    b.style.fontSize = px(opts.size || kb.font_size); b.style.fontWeight = opts.weight || 400;
+    b.style.fontSize = px(opts.size || kb.font_size); b.style.fontWeight = WEIGHT[kb.font] || 500;
     if (opts.color) b.style.color = opts.color;
     if (opts.icon) { const i = document.createElement("img"); i.src = asset(opts.icon); i.alt = ""; if (opts.rotate) i.style.transform = `rotate(${opts.rotate}deg)`; b.appendChild(i); b.setAttribute("aria-label", opts.aria || label); }
     else b.textContent = label;
@@ -334,9 +356,9 @@ function renderKeyboard(n, kb, onAction) {
   const y3 = 4 + 2 * pitch, y4 = 4 + 3 * pitch;
   key(8, y3, 56, "shift", kbMode === "upper" ? "#3a3a3a" : kb.function_color, "kb:shift", { icon: iconPath("back", 22, "white"), rotate: 90, aria: "Shift" });
   key(416, y3, 56, "delete", kb.function_color, "kb:del", { icon: iconPath("backspace", 26, "white"), aria: "Delete" });
-  key(8, y4, 88, kbMode === "sym" ? "ABC" : "123", kb.function_color, "kb:sym", { size: kb.function_font_size, weight: 500 });
+  key(8, y4, 88, kbMode === "sym" ? "ABC" : "123", kb.function_color, "kb:sym", { size: kb.function_font_size });
   key(104, y4, 272, "space", kb.key_color, "kb: ", { size: kb.function_font_size });
-  key(384, y4, 88, "GO", kb.ok_color, "kb:go", { size: kb.function_font_size, weight: 500, color: kb.ok_text_color });
+  key(384, y4, 88, "GO", kb.ok_color, "kb:go", { size: kb.function_font_size, color: kb.ok_text_color });
 }
 
 function renderList(root, vp, kind, items, onAction) {
@@ -357,7 +379,7 @@ function renderList(root, vp, kind, items, onAction) {
     if (onAction) {
       const hit = document.createElement("button");
       hit.type = "button"; hit.className = "row-hit";
-      hit.style.left = "0"; hit.style.top = px(y); hit.style.width = px(vp.w); hit.style.height = px(ROW_H[kind] - 8);
+      hit.style.left = "0"; hit.style.top = px(y); hit.style.width = px(vp.w); hit.style.height = px(60);
       hit.setAttribute("aria-label", values[kind === "apps" ? "apps_name" : "networks_title"]);
       hit.addEventListener("click", () => onAction(`row:${kind}:${i}`));
       content.appendChild(hit);
@@ -371,6 +393,7 @@ function buildLayer(objs, lists, onAction) {
   const layer = document.createElement("div");
   layer.className = "layer";
   for (const o of objs) {
+    if (o.visible === false) continue;
     if (o.type === "list_viewport") {
       if (lists && lists[o.name]) renderList(layer, o, o.name, lists[o.name], onAction);
       continue;
@@ -384,7 +407,11 @@ function buildLayer(objs, lists, onAction) {
 /* ---------------- Views ---------------- */
 const named = (objs, name) => objs.find((o) => o.name === name);
 function setText(objs, name, text) { const o = named(objs, name); if (o) o.text = text; return o; }
-function setIcon(objs, name, image) { const o = named(objs, name); if (o && o.icon) o.icon.image = image; }
+function setImage(objs, name, image) {
+  const o = named(objs, name);
+  if (o && o.type === "image") o.image = image;
+  else if (o && o.icon) o.icon.image = image;
+}
 function without(objs, names) { return objs.filter((o) => !names.includes(o.name)); }
 function tpl(id) { return clone(STATES[id].objects).filter((o) => o.name !== "ai_cue"); }
 function initial(name) { return (name || "?").trim().charAt(0).toUpperCase(); }
@@ -392,20 +419,34 @@ function sortedApps() {
   return [...model.apps].sort((a, b) => (b.official - a.official) ||
     (a.id.length - b.id.length) || a.id.localeCompare(b.id));
 }
+function filteredApps(flt = model.filter) {
+  const apps = sortedApps();
+  if (flt === "all") return apps;
+  if (flt === "favorites") return apps.filter((a) => model.favorites.has(a.id));
+  return apps.filter((a) => a.category === flt);
+}
 const appById = (id) => model.apps.find((a) => a.id === id);
+const sizeMB = (a) => parseFloat(a.size) || 0;
+
+function statusIcons(objs) {
+  setImage(objs, "status_wifi", model.wifi.connected ? iconPath("wifi", 22, "white") : iconPath("wifi_off", 22, "grey"));
+  setImage(objs, "status_agent", iconPath("robot", 22, model.agent ? "orange" : "grey"));
+  setImage(objs, "status_battery", iconPath("battery_mid", 22, "white"));
+}
 
 function homeView() {
-  const apps = sortedApps();
-  let objs = tpl(apps.length ? "home" : "home-empty");
-  const live = model.agent;
-  const dot = objs.find((o) => o.name && o.name.startsWith("status_dot"));
-  if (dot) dot.bg = live ? C.accent : C.text_tertiary;
-  setText(objs, "home_status", live ? "Agent connected · USB" : "Ready for your AI agent · plug in USB");
+  const flt = model.filter;
+  const apps = filteredApps();
+  const kind = flt === "all" ? "" : flt === "favorites" ? "-favorites" : "-category";
+  const objs = tpl(apps.length ? `home${kind}` : `home${kind || ""}-empty`);
+  statusIcons(objs);
+  setText(objs, "home_title", P.filter_titles[flt]);
   setText(objs, "app_count", String(apps.length).padStart(2, "0"));
-  setIcon(objs, "button_wifi", model.wifi.connected ? iconPath("wifi", 18, "white") : iconPath("wifi_off", 18, "grey"));
+  if (CAT_LABEL[flt]) setText(objs, "chip_category_on", CAT_LABEL[flt]);
   const rows = apps.map((a) => ({
-    apps_initial: initial(a.name), apps_name: a.name, apps_detail: `ID ${a.id} · v${a.version}`,
-    apps_badge_current: model.current === a.id ? "● CURRENT" : " ", apps_badge_official: a.official ? "OFFICIAL" : " ",
+    apps_initial: initial(a.name), apps_star: model.favorites.has(a.id) ? "★" : " ", apps_name: a.name,
+    apps_detail: `${catLabel(a.category)} · ${a.id}`, apps_badge_current: model.current === a.id ? "● CURRENT" : " ",
+    apps_badge_source: a.official ? " " : "COMMUNITY",
   }));
   return { objs, lists: { apps: rows } };
 }
@@ -414,23 +455,54 @@ function quickSwitchObjs() {
   const objs = clone(STATES["quick-switch"].objects);
   const start = objs.findIndex((o) => o.role === "scrim");
   const overlay = objs.slice(start).filter((o) => o.name !== "ai_cue");
-  const apps = sortedApps();
+  const apps = filteredApps();
   const app = apps[model.qs.index];
+  setText(overlay, "switch_filter", `QUICK SWITCH · ${P.filter_titles[model.filter]}`);
   setText(overlay, "switch_position", `${model.qs.index + 1}/${apps.length}`);
   setText(overlay, "switch_initial", initial(app.name));
   setText(overlay, "switch_name", app.name);
-  setText(overlay, "switch_detail", `ID ${app.id} · v${app.version}${model.current === app.id ? " · current" : ""}`);
+  setText(overlay, "switch_detail", `${catLabel(app.category)} · ${app.id}${model.current === app.id ? " · current" : ""}`);
   const hold = named(overlay, "switch_hold"); if (hold) hold.value = 0;
   return overlay;
 }
 
-function addView() {
-  const objs = tpl("add");
-  const d = model.add.digits;
+function categoriesView() {
+  const objs = tpl("categories");
+  const counts = { all: model.apps.length, favorites: filteredApps("favorites").length };
+  for (const c of P.categories) counts[c.id] = filteredApps(c.id).length;
+  for (const [key, n] of Object.entries(counts)) setText(objs, `category_${key}_count`, String(n).padStart(2, "0"));
+  const ring = named(objs, "category_selected"), tile = named(objs, `category_${model.filter}`);
+  if (ring && tile) { ring.x = tile.x; ring.y = tile.y; }
+  return { objs };
+}
+
+function downloadView() {
+  const objs = tpl("download");
+  const d = model.dl.digits;
   setText(objs, "id_digits", d.length <= 8 ? d + "·".repeat(Math.max(0, 6 - d.length)) : " ");
   setText(objs, "id_digits_compact", d.length > 8 ? d : " ");
-  setText(objs, "id_status", model.add.error ? " " : model.add.status);
-  setText(objs, "id_error", model.add.error || " ");
+  setText(objs, "id_status", model.dl.error ? " " : model.dl.status);
+  setText(objs, "id_error", model.dl.error || " ");
+  return { objs };
+}
+
+function pairedStatus(objs, name, on, onText, offText) {
+  const o = named(objs, `${name}_on`) || named(objs, `${name}_off`);
+  if (!o) return;
+  o.text = on ? onText : offText; o.color = on ? C.accent : C.text_secondary; o.name = `${name}_${on ? "on" : "off"}`;
+}
+
+function developView() {
+  const objs = tpl("develop");
+  pairedStatus(objs, "develop_usb", model.usb, "Plugged in", "Not plugged in");
+  pairedStatus(objs, "develop_link", model.agent, "Connected", "Waiting");
+  setText(objs, "develop_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
+  return { objs };
+}
+
+function wifiLinkView() {
+  const objs = tpl("wifi-link");
+  setText(objs, "wifilink_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
   return { objs };
 }
 
@@ -443,13 +515,28 @@ function detailView() {
   setText(objs, "detail_name", app.name);
   setText(objs, "detail_id", app.id);
   setText(objs, "detail_meta", `v${app.version} · ${app.size}`);
-  setText(objs, "detail_source", app.official ? "Official" : "Community");
+  setImage(objs, "button_qr_app_code", `assets/qr/app-${app.id}.png`);
+  setText(objs, "detail_summary", app.summary || "");
+  setText(objs, "detail_facts", `${catLabel(app.category)} · ${app.official ? "Official" : "Community"}`);
   const local = appById(app.id);
-  const status = mode === "current" ? "Current app" : mode === "local" ? "Saved · not running" :
+  const status = mode === "current" ? "● Current app" : mode === "local" ? "Saved · not running" :
     mode === "remote_update" ? `Update · v${local.version} → v${app.version}` : "Not on this device";
-  const accent = mode === "current" || mode === "remote_update";
-  setText(objs, "detail_status", accent ? " " : status);
-  setText(objs, "detail_status_accent", accent ? status : " ");
+  setText(objs, "detail_status", status);
+  setText(objs, "detail_status_accent", status);
+  const fav = objs.find((o) => o.name && o.name.startsWith("button_favorite"));
+  if (fav) {
+    const on = model.favorites.has(app.id);
+    fav.icon.image = on ? iconPath("star_fill", 22, "orange") : iconPath("star", 22, "white");
+    fav.name = on ? "button_favorite_on" : "button_favorite_off";
+  }
+  return { objs };
+}
+
+function qrView(p) {
+  const objs = tpl("qr-full");
+  setImage(objs, "qr_full_code", `assets/qr/${p.name}.png`);
+  setText(objs, "qr_full_title", p.title);
+  setText(objs, "qr_full_url", p.url);
   return { objs };
 }
 
@@ -489,31 +576,39 @@ function wifiView() {
   return { objs, lists: { networks: rows } };
 }
 
-function passwordView() {
-  const objs = tpl("password");
-  const p = model.password;
-  setText(objs, "password_subtitle", p.ssid);
-  const shown = p.text ? (p.visible ? p.text : "•".repeat(p.text.length)) : "Type the Wi-Fi password";
-  const disp = setText(objs, "password_display", shown.length > 22 ? shown.slice(-22) : shown);
-  if (disp && !p.text) disp.color = C.text_tertiary;
-  setIcon(objs, "button_toggle_password", iconPath(p.visible ? "eye_off" : "eye", 24, "white"));
-  setText(objs, "password_error", p.error || " ");
+function entryView(page) {
+  const objs = tpl(page);
+  const e = model.entry, spec = ENTRY[page];
+  if (page === "password") setText(objs, "password_subtitle", model.password.ssid);
+  let shown = e.text;
+  if (e.text && page !== "city" && !e.visible) {
+    shown = page === "token" && e.text.length > 8 ? "•".repeat(12) + e.text.slice(-4) : "•".repeat(e.text.length);
+  }
+  const disp = setText(objs, `${page}_display`, e.text ? (shown.length > 22 ? shown.slice(-22) : shown) : spec.placeholder);
+  if (disp) disp.color = e.text ? C.text : C.text_tertiary;
+  setImage(objs, `button_toggle_${page}`, iconPath(e.visible ? "eye_off" : "eye", 24, "white"));
+  const note = setText(objs, `${page}_note`, e.error || spec.note);
+  if (note && e.error) note.color = C.accent;
   return { objs };
 }
 
 function deviceView() {
   const objs = tpl("device");
   setText(objs, "device_wifi", model.wifi.connected ? model.wifi.ssid : "Not connected");
-  setText(objs, "device_storage", `${model.apps.length} apps · ${(model.apps.length * 1.9).toFixed(1)} MB used`);
-  setText(objs, "device_endpoint", model.wifi.connected ? `Wi-Fi link  ${model.wifi.ip}:7777` : "Wi-Fi link  connect Wi-Fi first");
+  setText(objs, "device_city", model.city || "Not set");
+  setText(objs, "device_token", model.token ? `Set · ends in ${model.token.slice(-4)}` : "Not set");
+  const used = model.apps.reduce((sum, a) => sum + sizeMB(a), 0);
+  setText(objs, "device_storage", `${model.apps.length} apps · ${used.toFixed(1)} MB used`);
   return { objs };
 }
 
 function simpleView(id, edit) { const objs = tpl(id); if (edit) edit(objs); return { objs }; }
 
 const VIEWS = {
-  home: homeView, add: addView, detail: detailView, progress: progressView, result: resultView,
-  wifi: wifiView, password: passwordView, device: deviceView,
+  home: homeView, categories: categoriesView, download: downloadView, develop: developView, wifi_link: wifiLinkView,
+  detail: detailView, qr: qrView, progress: progressView, result: resultView, wifi: wifiView,
+  password: () => entryView("password"), city: () => entryView("city"), token: () => entryView("token"),
+  device: deviceView,
   help: () => simpleView("help"),
   topic: (p) => simpleView(`help-topic-${p.key}`),
   guide: (p) => simpleView(`guide-${p.step}`),
@@ -540,7 +635,7 @@ function render(dir = 0) {
       const r = screen.getBoundingClientRect(), k = r.width / 480;
       const x = (e.clientX - r.left) / k, y = (e.clientY - r.top) / k;
       const inside = x >= card.x && x < card.x + card.w && y >= card.y && y < card.y + card.h;
-      if (inside) { const app = sortedApps()[model.qs.index]; model.qs = null; runApp(app); }
+      if (inside) { const app = filteredApps()[model.qs.index]; model.qs = null; runApp(app); }
       else { model.qs = null; render(0); }
     });
     layer.appendChild(overlay);
@@ -611,8 +706,8 @@ function launch(app, viaInstall) {
   setTimeout(() => { model.running = app.name; stack = [{ view: "running", params: { name: app.name } }]; render(1); }, viaInstall ? 900 : 1300);
 }
 function install(app, from) {
-  const total = parseFloat(app.size) || 1.5;
-  runProgress({ kind: "install", caption: from === "store" ? "FROM THE APP STORE" : "FROM YOUR LIBRARY",
+  const total = sizeMB(app) || 1.5;
+  runProgress({ kind: "install", caption: from === "store" ? "FROM MOSAICO IDEAS" : "FROM YOUR LIBRARY",
     title: "Switching apps", detail: `${app.name} · v${app.version}`, total, rate: "1.6 MB/s",
     step: "Step 1 of 2 · Checking", steps: ["Step 1 of 2 · Writing", "Step 2 of 2 · Verifying"] }, 3200, () => {
     model.current = app.id;
@@ -625,40 +720,40 @@ function runApp(app) {
   else install(app, "library");
 }
 function download(app, thenRun) {
-  const total = parseFloat(app.size) || 1;
-  runProgress({ kind: "download", caption: "FROM THE APP STORE", title: "Downloading", detail: `${app.name} · v${app.version}`,
+  const total = sizeMB(app) || 1;
+  runProgress({ kind: "download", caption: "FROM MOSAICO IDEAS", title: "Downloading", detail: `${app.name} · v${app.version}`,
     total, rate: "512 KB/s", step: "File 1 of 3", steps: ["File 2 of 3", "File 3 of 3 · Checking"] }, 3800, () => {
     const existing = appById(app.id);
-    if (existing) Object.assign(existing, app); else model.apps.push(clone(app));
+    if (existing) Object.assign(existing, clone(app)); else model.apps.push(clone(app));
     if (thenRun) install(app, "store");
     else showResult({ kind: "saved", title: "Saved to My Apps", caption: `${app.name} · v${app.version}`,
                       detail: "Open it any time from My Apps.", second: "Open now", app });
   });
 }
 function lookup() {
-  const id = model.add.digits;
-  if (!id) { model.add.error = "Type an app ID first"; render(0); return; }
+  const id = model.dl.digits;
+  if (!id) { model.dl.error = "Type an app ID first"; render(0); return; }
   if (!model.wifi.connected) { model.pendingLookup = true; go("wifi"); return; }
-  model.add.error = ""; model.add.status = `Looking up ${id}…`; render(0);
+  model.dl.error = ""; model.dl.status = "Looking up…"; render(0);
   setTimeout(() => {
-    if (cur().view !== "add") return;
-    model.add.status = "Enter the app ID";
-    if (id === "500500") { model.add.error = "Store is busy. Try again soon."; render(0); return; }
-    if (id === "666666") { model.add.error = "Not available for this device"; render(0); return; }
+    if (cur().view !== "download") return;
+    model.dl.status = "Enter the app ID";
+    if (id === "500500") { model.dl.error = "Store is busy. Try again soon."; render(0); return; }
+    if (id === "666666") { model.dl.error = "Not available for this device"; render(0); return; }
     const found = STORE[id];
-    if (!found) { model.add.error = "No app with this ID"; render(0); return; }
-    const app = Object.assign({ id }, found);
+    if (!found) { model.dl.error = "No app with this ID"; render(0); return; }
+    const app = clone(found);
     const local = appById(id);
     if (local && local.version === app.version) {
       model.detail = { mode: model.current === id ? "current" : "local", app: local };
     } else {
       model.detail = { mode: local ? "remote_update" : "remote_new", app };
     }
-    model.add.digits = "";
+    model.dl.digits = "";
     go("detail");
   }, 900);
 }
-function connect(ssid, password) {
+function connect(ssid) {
   model.wifi = { connected: false, connecting: ssid, ssid: "", ip: "" };
   stack = stack.filter((s) => s.view !== "password");
   render(-1);
@@ -673,6 +768,29 @@ function connect(ssid, password) {
     } else render(0);
   }, 1200);
 }
+function qrTarget(name) {
+  if (name === "app") {
+    const app = model.detail.app;
+    return { name: `app-${app.id}`, title: `${app.name} on Mosaico Ideas`, url: app.url.replace(/^https?:\/\//, "") };
+  }
+  const titles = { ideas: "Browse apps on Mosaico Ideas", develop: "Vibe-coding guide", "help-start": "Getting started",
+                   "help-ids": "App IDs & sharing", "help-fix": "Troubleshooting" };
+  return { name, title: titles[name] || "Scan with your phone camera", url: P.qr_urls[name] || "" };
+}
+function submitEntry(page) {
+  const e = model.entry;
+  if (page === "password") {
+    if (e.text.length < 8) { e.error = "Use at least 8 characters"; return render(0); }
+    if (e.text === "wrongpass") { e.error = "Wrong password. Try again."; return render(0); }
+    return connect(model.password.ssid);
+  }
+  const value = e.text.trim();
+  if (page === "city") {
+    if (!value) { e.error = "Type a city name first"; return render(0); }
+    model.city = value; back(); return toast("City saved");
+  }
+  model.token = value; back(); return toast(value ? "AI token saved" : "AI token cleared");
+}
 
 /* ---------------- Actions ---------------- */
 let deleteTimer = null;
@@ -680,10 +798,18 @@ function onAction(action) {
   const [kind, arg, extra] = action.split(":");
   if (kind === "go") {
     if (arg === "home") return home();
-    if (arg === "add") { model.add.error = ""; model.add.status = "Enter the app ID"; }
+    if (arg === "download") model.dl = { digits: "", status: "Enter the app ID", error: "" };
+    if (arg === "city") { model.entry = { text: model.city || "", visible: true, error: "" }; kbMode = "lower"; }
+    if (arg === "token") { model.entry = { text: model.token || "", visible: false, error: "" }; kbMode = "lower"; }
     return go(arg);
   }
   if (action === "back") return back();
+  if (kind === "filter") {
+    model.filter = arg;
+    if (cur().view === "categories") { stack.pop(); return render(-1); }
+    return render(0);
+  }
+  if (kind === "qr") return go("qr", qrTarget(arg));
   if (kind === "help") {
     if (arg !== "topics") return go("topic", { key: arg });
     const prev = stack[stack.length - 2];
@@ -694,32 +820,39 @@ function onAction(action) {
     return replace("guide", { step: Number(arg) });
   }
   if (kind === "key") {
-    const a = model.add;
-    if (arg === "del") { a.digits = a.digits.slice(0, -1); a.error = ""; }
+    const d = model.dl;
+    if (arg === "del") { d.digits = d.digits.slice(0, -1); d.error = ""; }
     else if (arg === "go") return lookup();
-    else if (a.digits.length < 16) { a.digits += arg; a.error = ""; a.status = a.digits.length ? "Tap → to look it up" : "Enter the app ID"; }
+    else if (d.digits.length < 16) { d.digits += arg; d.error = ""; }
+    d.status = d.digits.length ? "Tap → to look it up" : "Enter the app ID";
     return render(0);
   }
   if (kind === "row" && arg === "apps") {
-    const app = sortedApps()[Number(extra)];
+    const app = filteredApps()[Number(extra)];
     model.detail = { mode: model.current === app.id ? "current" : "local", app };
     return go("detail");
   }
   if (kind === "row" && arg === "networks") {
     const n = NETWORKS[Number(extra)];
-    if (!n.secured) return connect(n.ssid, "");
-    model.password = { ssid: n.ssid, text: "", visible: false, error: "" };
+    if (!n.secured) return connect(n.ssid);
+    model.password = { ssid: n.ssid };
+    model.entry = { text: "", visible: false, error: "" };
     kbMode = "lower";
     return go("password");
   }
   if (kind === "app") {
     const app = model.detail.app;
+    if (arg === "favorite") {
+      const on = !model.favorites.has(app.id);
+      if (on) model.favorites.add(app.id); else model.favorites.delete(app.id);
+      return toast(on ? "Added to Favorites" : "Removed from Favorites");
+    }
     if (arg === "run") return runApp(app);
     if (arg === "update") {
       const latest = STORE[app.id];
       if (!model.wifi.connected) { go("wifi"); return toast("Connect Wi-Fi to check for updates"); }
       if (latest && latest.version !== app.version) {
-        model.detail = { mode: "remote_update", app: Object.assign({ id: app.id }, latest) };
+        model.detail = { mode: "remote_update", app: clone(latest) };
         return replace("detail");
       }
       return toast(`Up to date: ${app.name}`);
@@ -732,6 +865,7 @@ function onAction(action) {
     }
     if (arg === "delete") {
       model.apps = model.apps.filter((a) => a.id !== app.id);
+      model.favorites.delete(app.id);
       if (model.current === app.id) model.current = null;
       model.deleteArmed = false;
       home(); return toast(`Deleted: ${app.name}`);
@@ -750,18 +884,15 @@ function onAction(action) {
     if (arg === "forget") { model.wifi = { connected: false, ssid: "", ip: "" }; syncSim(); return render(0); }
     if (arg === "scan") { model.scanning = true; render(0); setTimeout(() => { model.scanning = false; if (cur().view === "wifi") render(0); }, 1200); return; }
   }
-  if (kind === "password" && arg === "toggle") { model.password.visible = !model.password.visible; return render(0); }
+  if (ENTRY[kind] && arg === "toggle") { model.entry.visible = !model.entry.visible; return render(0); }
   if (kind === "kb") {
-    const p = model.password;
+    const page = cur().view, e = model.entry;
     const ch = action.slice(3);
     if (ch === "shift") kbMode = kbMode === "upper" ? "lower" : "upper";
     else if (ch === "sym") kbMode = kbMode === "sym" ? "lower" : "sym";
-    else if (ch === "del") p.text = p.text.slice(0, -1);
-    else if (ch === "go") {
-      if (p.text.length < 8) { p.error = "Use at least 8 characters"; return render(0); }
-      if (p.text === "wrongpass") { p.error = "Wrong password. Try again."; return render(0); }
-      return connect(p.ssid, p.text);
-    } else if (p.text.length < 64) { p.text += ch; p.error = ""; if (kbMode === "upper") kbMode = "lower"; }
+    else if (ch === "del") e.text = e.text.slice(0, -1);
+    else if (ch === "go") return submitEntry(page);
+    else if (e.text.length < ENTRY[page].limit) { e.text += ch; e.error = ""; if (kbMode === "upper") kbMode = "lower"; }
     return render(0);
   }
   if (kind === "proto" && arg === "return") return enterVibeMode(false);
@@ -805,7 +936,7 @@ function gesture(g) {
   const view = cur().view;
   if (["progress", "launching", "running", "boot"].includes(view)) return;
   if (model.qs) {
-    const apps = sortedApps();
+    const apps = filteredApps();
     if (g === "single") { model.qs = null; return render(0); }
     if (g === "double") { model.qs.index = (model.qs.index + 1) % apps.length; return render(0); }
     if (g === "long") { const app = apps[model.qs.index]; model.qs = null; return runApp(app); }
@@ -818,8 +949,8 @@ function gesture(g) {
   }
   if (g === "single") { if (!back()) toast("Double-press AI to switch apps"); return; }
   if (g === "double") {
-    const apps = sortedApps();
-    if (!apps.length) return toast("No apps yet. Add one first.");
+    const apps = filteredApps();
+    if (!apps.length) return toast("No apps in this list");
     const currentIndex = apps.findIndex((a) => a.id === model.current);
     model.qs = { index: (currentIndex + 1) % apps.length };
     return render(0);
@@ -832,7 +963,7 @@ aiKey.addEventListener("pointercancel", aiUp);
 aiKey.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); aiDown(); } });
 aiKey.addEventListener("keyup", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); aiUp(); } });
 
-/* Power key: with AI held, a double-press restarts into Vibe Mode. */
+/* Power key (bottom right): with AI held, a double-press restarts into Vibe Mode. */
 const powerKey = document.getElementById("powerKey");
 let lastPower = 0;
 powerKey.addEventListener("click", () => {
@@ -841,7 +972,7 @@ powerKey.addEventListener("click", () => {
   lastPower = now;
   powerKey.classList.add("on"); setTimeout(() => powerKey.classList.remove("on"), 150);
   if (isDouble && ai.down) enterVibeMode(true);
-  else if (isDouble) note("双击开关机键会重启设备；进入 Vibe Mode 需要同时按住 AI 键（键盘 ↑）。");
+  else if (isDouble) note("双击开关机键会重启设备；进入 Vibe Mode 需要同时按住右上角 AI 键（键盘 ↑）。");
 });
 function enterVibeMode(heldAI) {
   cancelJob(); model.qs = null; model.running = null; toastText = "";
@@ -854,17 +985,17 @@ function enterVibeMode(heldAI) {
   }, 900);
 }
 
-/* Keyboard: ↑ is the AI key; digits and letters reach the keypad/keyboard. */
+/* Keyboard: ↑ is the AI key; digits and letters reach the keypad and keyboard pages. */
 document.addEventListener("keydown", (e) => {
   if (e.target.closest && e.target.closest(".panel, .gallery, .static-bar")) return;
   if (e.key === "ArrowUp") { if (!e.repeat) aiDown(); e.preventDefault(); return; }
   if (staticMode) return;
   const view = cur().view;
-  if (view === "add") {
+  if (view === "download") {
     if (/^[0-9]$/.test(e.key)) onAction(`key:${e.key}`);
     else if (e.key === "Backspace") onAction("key:del");
     else if (e.key === "Enter") onAction("key:go");
-  } else if (view === "password") {
+  } else if (ENTRY[view]) {
     if (e.key.length === 1) onAction(`kb:${e.key}`);
     else if (e.key === "Backspace") onAction("kb:del");
     else if (e.key === "Enter") onAction("kb:go");
@@ -879,25 +1010,30 @@ for (const [id, text] of TRY_IDS) {
   b.type = "button"; b.textContent = id;
   b.addEventListener("click", () => {
     if (staticMode) exitStatic();
-    model.qs = null; model.add = { digits: id, status: "Tap → to look it up", error: "" };
-    stack = [{ view: "home", params: {} }, { view: "add", params: {} }]; render(1);
+    model.qs = null; model.dl = { digits: id, status: "Tap → to look it up", error: "" };
+    stack = [{ view: "home", params: {} }, { view: "download", params: {} }]; render(1);
   });
   const s = document.createElement("span"); s.textContent = text;
   idList.append(b, s);
 }
 function syncSim() {
-  const a = document.getElementById("simAgent"), w = document.getElementById("simWifi");
+  const a = document.getElementById("simAgent"), u = document.getElementById("simUsb"), w = document.getElementById("simWifi");
   a.setAttribute("aria-pressed", String(model.agent)); a.textContent = model.agent ? "AI Agent 已连接" : "AI Agent 未连接";
+  u.setAttribute("aria-pressed", String(model.usb)); u.textContent = model.usb ? "USB 数据线已插入" : "USB 数据线未插入";
   w.setAttribute("aria-pressed", String(model.wifi.connected)); w.textContent = model.wifi.connected ? "Wi‑Fi 已连接" : "Wi‑Fi 未连接";
 }
-document.getElementById("simAgent").addEventListener("click", () => { model.agent = !model.agent; syncSim(); if (!staticMode) render(0); });
+document.getElementById("simAgent").addEventListener("click", () => {
+  model.agent = !model.agent; syncSim();
+  if (!staticMode) { if (model.agent) toast("AI agent connected"); else render(0); }
+});
+document.getElementById("simUsb").addEventListener("click", () => { model.usb = !model.usb; syncSim(); if (!staticMode) render(0); });
 document.getElementById("simWifi").addEventListener("click", () => {
   model.wifi = model.wifi.connected ? { connected: false, ssid: "", ip: "" } : { connected: true, ssid: "Studio-5G", ip: "192.168.1.20" };
   syncSim(); if (!staticMode) render(0);
 });
 document.getElementById("simDeploy").addEventListener("click", () => {
   if (staticMode) exitStatic();
-  model.qs = null; model.agent = true; syncSim();
+  model.qs = null; model.agent = true; model.usb = true; syncSim();
   const app = { id: "agent", name: "hello_world", version: "0.2.1", size: "2.85 MB" };
   stack = [{ view: "home", params: {} }];
   runProgress({ kind: "agent", caption: "FROM YOUR AI AGENT · USB", title: "Installing your app", detail: "hello_world · v0.2.1",
@@ -919,11 +1055,8 @@ document.getElementById("simReset").addEventListener("click", () => {
 });
 
 /* ---------------- Gallery and static preview ---------------- */
-const device = document.getElementById("device");
-function showStatic(state) {
-  staticMode = true;
-  device.classList.add("static");
-  document.getElementById("staticName").textContent = state.title;
+const staticBar = document.getElementById("staticBar");
+function staticLayer(state) {
   const layer = buildLayer(state.objects, null, null);
   // Static screens keep their baked list rows, clipped to their viewports.
   for (const o of state.objects) if (o.row_of) {
@@ -932,10 +1065,16 @@ function showStatic(state) {
     n.style.clipPath = `inset(${Math.max(0, cy - o.y)}px ${Math.max(0, o.x + o.w - cx - cw)}px ${Math.max(0, o.y + o.h - cy - ch)}px ${Math.max(0, cx - o.x)}px)`;
     layer.appendChild(n);
   }
-  screen.replaceChildren(layer);
+  return layer;
+}
+function showStatic(state) {
+  staticMode = true;
+  staticBar.classList.add("show");
+  document.getElementById("staticName").textContent = state.title;
+  screen.replaceChildren(staticLayer(state));
   screen.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
-function exitStatic() { staticMode = false; device.classList.remove("static"); render(0); }
+function exitStatic() { staticMode = false; staticBar.classList.remove("show"); render(0); }
 document.getElementById("staticExit").addEventListener("click", exitStatic);
 const thumbs = document.getElementById("thumbs");
 for (const state of LAYOUT.states) {
@@ -943,26 +1082,22 @@ for (const state of LAYOUT.states) {
   b.type = "button"; b.className = "thumb";
   const mini = document.createElement("div"); mini.className = "mini";
   const inner = document.createElement("div"); inner.className = "screen-static";
-  inner.appendChild(buildLayer(state.objects, null, null));
-  for (const o of state.objects) if (o.row_of) {
-    const n = renderObj(o, null);
-    const [cx, cy, cw, ch] = o.clip;
-    n.style.clipPath = `inset(${Math.max(0, cy - o.y)}px ${Math.max(0, o.x + o.w - cx - cw)}px ${Math.max(0, o.y + o.h - cy - ch)}px ${Math.max(0, cx - o.x)}px)`;
-    inner.firstChild.appendChild(n);
-  }
+  inner.appendChild(staticLayer(state));
   mini.appendChild(inner);
   const cap = document.createElement("span"); cap.textContent = state.title;
   b.append(mini, cap);
   b.addEventListener("click", () => showStatic(state));
   thumbs.appendChild(b);
 }
+document.getElementById("galleryNote").textContent =
+  `设计文档中的 ${LAYOUT.states.length} 个页面状态。点开可在设备中查看静态页面，再点“返回可交互原型”继续操作。`;
 
 /* ---------------- Fit the device to narrow screens ---------------- */
 const fit = document.getElementById("deviceFit"), scaleBox = document.getElementById("deviceScale");
 function fitDevice() {
   const s = Math.min(1, fit.clientWidth / 560);
   scaleBox.style.transform = `scale(${s})`;
-  fit.style.height = `${600 * s}px`;
+  fit.style.height = `${616 * s}px`;
 }
 new ResizeObserver(fitDevice).observe(fit);
 fitDevice();

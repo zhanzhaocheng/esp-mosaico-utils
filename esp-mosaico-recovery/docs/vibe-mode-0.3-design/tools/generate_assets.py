@@ -9,6 +9,10 @@ Font sources are the OFL variable fonts from https://github.com/google/fonts:
 (checked against google/fonts commit bd8f81ddb5c74d5c8897b36ad88b440266245103).
 Pass the checkout root with ``--google-fonts``; icons and QR codes need no
 external input. Each output is deterministic for the same tool versions.
+
+QR codes are written at one pixel per module (33 x 33 px for version 3 with a
+2-module quiet zone). Layouts scale them by an integer factor with
+nearest-neighbour sampling, as the firmware's runtime QR encoder will.
 """
 from __future__ import annotations
 
@@ -17,6 +21,8 @@ import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw
+
+from sample_data import QR_APPS
 
 DESIGN = Path(__file__).resolve().parents[1]
 ASSETS = DESIGN / "assets"
@@ -30,18 +36,22 @@ ORANGE = (255, 76, 1)
 # ASCII plus the few symbols the English design uses. The Chinese phase only
 # extends NOTO_EXTRA with its fixed CJK copy; the fonts themselves stay.
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
-NOTO_EXTRA = "·•…—–‹›→←↑↓×°✓●○"
+NOTO_EXTRA = "·•…—–‹›→←↑↓×°✓●○★☆"
 DOTO_EXTRA = "·•…—–×°"
 
-# Stable short links the website can redirect. Placeholders until the official
-# documentation URLs are confirmed; keep each URL <= 42 bytes (QR version 3-M).
+# QR payloads. "develop" is the official vibe-coding guide; the help links are
+# placeholders the website can redirect until the documentation URLs are
+# confirmed. Every payload must stay <= 53 bytes (QR version 3, ECC L).
 QR_CODES = {
     "ideas": "https://mosaico-ideas.espressif.com/",
+    "develop": "https://mosaico.espressif.com/guide/vibe-coding/",
     "help-start": "https://mosaico.espressif.com/vibe/start",
-    "help-agent": "https://mosaico.espressif.com/vibe/agent",
     "help-ids": "https://mosaico.espressif.com/vibe/ids",
     "help-fix": "https://mosaico.espressif.com/vibe/fix",
 }
+QR_CODES.update({f"app-{app['id']}": app["url"] for app in QR_APPS})
+QR_VERSION, QR_BORDER = 3, 2
+QR_MODULES = 17 + 4 * QR_VERSION + 2 * QR_BORDER  # 33
 
 
 # --------------------------------------------------------------------------
@@ -51,7 +61,8 @@ def _instance(source: Path, axes: dict[str, float]):
     from fontTools.ttLib import TTFont
     from fontTools.varLib import instancer
 
-    font = TTFont(source)
+    # Keep the source timestamp so rebuilt subsets are byte-identical.
+    font = TTFont(source, recalcTimestamp=False)
     instancer.instantiateVariableFont(font, axes, inplace=True, updateFontNames=False)
     return font
 
@@ -215,16 +226,74 @@ def _question(p: Pen) -> None:
     p.dot(12, 19, 1.25)
 
 
-def _agent(p: Pen) -> None:
-    # Four-point spark: the common "AI" mark, drawn as a filled concave star.
-    c, r, s = 12, 9.5, 2.4
+def _robot(p: Pen) -> None:
+    # Same mark as the device's own status bar: the AI agent link.
+    p.rrect(4.5, 8.5, 19.5, 19.5, 3.5, 1.8)
+    p.line([(12, 8.5), (12, 5.2)], 1.8)
+    p.dot(12, 4.0, 1.6)
+    p.dot(9.2, 14, 1.6)
+    p.dot(14.8, 14, 1.6)
+    p.line([(2.2, 12.5), (2.2, 15.5)], 1.8)
+    p.line([(21.8, 12.5), (21.8, 15.5)], 1.8)
+
+
+def _battery(level: float | None):
+    def draw(p: Pen) -> None:
+        p.rrect(2.5, 7.5, 19.5, 16.5, 2.4, 1.6)
+        p.rrect(20.6, 10.2, 22.4, 13.8, 0.8, None)
+        if level is None:  # charging bolt
+            p.polygon([(12.6, 8.6), (7.6, 12.6), (10.6, 12.6), (9.4, 15.4), (14.4, 11.4), (11.4, 11.4)])
+        elif level > 0:
+            p.rrect(4.6, 9.6, 4.6 + 12.8 * level, 14.4, 1.0, None)
+    return draw
+
+
+def _star_points(cx=12.0, cy=12.7, outer=9.4, inner=3.9):
+    pts = []
+    for i in range(10):
+        a = math.radians(-90 + i * 36)
+        r = outer if i % 2 == 0 else inner
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
+def _star(fill: bool):
+    def draw(p: Pen) -> None:
+        pts = _star_points()
+        if fill:
+            p.polygon(pts)
+            for x, y in pts[::2]:
+                p.dot(x, y, 0.9)
+        else:
+            p.line(pts + pts[:1], 1.7)
+    return draw
+
+
+def _gear(p: Pen) -> None:
     pts = []
     for i in range(8):
-        a = math.radians(-90 + i * 45)
-        rad = r if i % 2 == 0 else s
-        pts.append((c + rad * math.cos(a), c + rad * math.sin(a)))
-    p.polygon(pts)
-    p.dot(19.5, 4.5, 1.4)
+        a = i * 45
+        for da, r in ((-16, 6.9), (-8, 9.6), (8, 9.6), (16, 6.9)):
+            t = math.radians(a + da)
+            pts.append((12 + r * math.cos(t), 12 + r * math.sin(t)))
+    p.line(pts + pts[:1], 1.6)
+    p.circle(12, 12, 2.8, 1.6)
+
+
+def _pin(p: Pen) -> None:
+    cx, cy, r = 12, 9.5, 6.6
+    a0, a1 = 140, 400
+    p.arc(cx, cy, r, a0, a1, 1.8)
+    for a in (a0, a1):
+        t = math.radians(a)
+        p.line([(cx + r * math.cos(t), cy + r * math.sin(t)), (12, 21)], 1.8)
+    p.circle(cx, cy, 2.3, 1.8)
+
+
+def _speaker(p: Pen) -> None:
+    p.line([(3.5, 9.5), (7.5, 9.5), (12.5, 5), (12.5, 19), (7.5, 14.5), (3.5, 14.5), (3.5, 9.5)], 1.7)
+    p.arc(12.5, 12, 4.2, -45, 45, 1.7)
+    p.arc(12.5, 12, 7.8, -50, 50, 1.7)
 
 
 def _usb(p: Pen) -> None:
@@ -240,7 +309,6 @@ def _usb(p: Pen) -> None:
 ICONS = {
     "back": lambda p: p.line([(15, 5), (8, 12), (15, 19)], 2.0),
     "chevron": lambda p: p.line([(9, 5), (16, 12), (9, 19)], 2.0),
-    "plus": lambda p: (p.line([(12, 5), (12, 19)], 2.2), p.line([(5, 12), (19, 12)], 2.2)),
     "check": lambda p: p.line([(5, 12.5), (10, 17.5), (19, 7)], 2.0),
     "close": lambda p: (p.line([(6, 6), (18, 18)], 2.0), p.line([(18, 6), (6, 18)], 2.0)),
     "arrow": lambda p: (p.line([(4.5, 12), (19, 12)], 2.0), p.line([(13, 6), (19, 12), (13, 18)], 2.0)),
@@ -263,8 +331,31 @@ ICONS = {
     "wifi_off": lambda p: _wifi(p, True),
     "settings": _sliders,
     "help": _question,
-    "agent": _agent,
+    "robot": _robot,
     "usb": _usb,
+    "battery_full": _battery(1.0),
+    "battery_mid": _battery(0.55),
+    "battery_low": _battery(0.18),
+    "battery_charging": _battery(None),
+    "star": _star(False),
+    "star_fill": _star(True),
+    "code": lambda p: (p.line([(8, 7), (3.5, 12), (8, 17)], 2.0), p.line([(16, 7), (20.5, 12), (16, 17)], 2.0),
+                       p.line([(13.6, 4.8), (10.4, 19.2)], 2.0)),
+    "pin": _pin,
+    "key": lambda p: (p.circle(7.5, 12, 4.2, 1.8), p.line([(11.7, 12), (21, 12)], 1.8),
+                      p.line([(17.6, 12), (17.6, 15.6)], 1.8), p.line([(20.6, 12), (20.6, 14.8)], 1.8)),
+    "grid": lambda p: [p.rrect(x, y, x + 6.5, y + 6.5, 1.6, 1.7) for x in (4, 13.5) for y in (4, 13.5)],
+    "house": lambda p: (p.line([(3.5, 11.5), (12, 4), (20.5, 11.5)], 1.8),
+                        p.line([(6, 9.6), (6, 20), (18, 20), (18, 9.6)], 1.8),
+                        p.line([(10, 20), (10, 14.5), (14, 14.5), (14, 20)], 1.8)),
+    "sensor": lambda p: p.line([(2.5, 12.5), (7, 12.5), (9.6, 6), (14, 19), (16.4, 12.5), (21.5, 12.5)], 1.8),
+    "display": lambda p: (p.rrect(3, 4.5, 21, 16.5, 2.2, 1.8), p.line([(12, 16.5), (12, 19.8)], 1.8),
+                          p.line([(8, 20), (16, 20)], 1.8)),
+    "audio": _speaker,
+    "chat": lambda p: (p.rrect(3.5, 4.5, 20.5, 15.8, 3.4, 1.8), p.line([(8.4, 15.8), (6.6, 20.4), (12.6, 15.8)], 1.8)),
+    "motor": _gear,
+    "expand": lambda p: (p.line([(4, 9), (4, 4), (9, 4)], 1.9), p.line([(15, 4), (20, 4), (20, 9)], 1.9),
+                         p.line([(4, 15), (4, 20), (9, 20)], 1.9), p.line([(20, 15), (20, 20), (15, 20)], 1.9)),
     "chip": lambda p: (p.rrect(6, 6, 18, 18, 2.5), p.rrect(9.5, 9.5, 14.5, 14.5, 1.0),
                        *[p.line([(x, 2.5), (x, 5)], 1.6) for x in (9.5, 14.5)],
                        *[p.line([(x, 19), (x, 21.5)], 1.6) for x in (9.5, 14.5)],
@@ -274,11 +365,6 @@ ICONS = {
                      p.line([(13.5, 10), (18, 10)]), p.line([(13.5, 14), (17, 14)])),
     "storage": lambda p: (p.earc(5, 3.5, 19, 8.5, 0, 360), p.line([(5, 6), (5, 18)]), p.line([(19, 6), (19, 18)]),
                           p.earc(5, 9.5, 19, 14.5, 0, 180), p.earc(5, 15.5, 19, 20.5, 0, 180)),
-    "terminal": lambda p: (p.rrect(3, 4.5, 21, 19.5, 2.5), p.line([(7, 9), (10, 12), (7, 15)]),
-                           p.line([(12.5, 15), (16.5, 15)])),
-    "scan": lambda p: (p.line([(3.5, 8), (3.5, 3.5), (8, 3.5)]), p.line([(16, 3.5), (20.5, 3.5), (20.5, 8)]),
-                       p.line([(3.5, 16), (3.5, 20.5), (8, 20.5)]), p.line([(16, 20.5), (20.5, 20.5), (20.5, 16)]),
-                       p.line([(3.5, 12), (20.5, 12)])),
     "flag": lambda p: (p.line([(5.5, 21), (5.5, 3.5)]), p.line([(5.5, 4.5), (18.5, 4.5), (15.5, 9), (18.5, 13.5), (5.5, 13.5)])),
     "hash": lambda p: (p.line([(9.5, 3.5), (7.5, 20.5)]), p.line([(16.5, 3.5), (14.5, 20.5)]),
                        p.line([(4, 9), (20, 9)]), p.line([(3.5, 15), (19.5, 15)])),
@@ -309,15 +395,25 @@ def _empty_grid(size: int, color) -> Image.Image:
 
 # (icon, size px, color name). Sizes match their on-screen boxes exactly.
 ICON_OUTPUTS = [
-    ("back", 22, "white"), ("help", 22, "white"), ("settings", 22, "white"),
-    ("wifi", 18, "white"), ("wifi_off", 18, "grey"), ("agent", 18, "orange"), ("agent", 18, "grey"),
-    ("usb", 18, "grey"), ("plus", 22, "black"), ("chevron", 18, "dim"), ("backspace", 26, "white"),
-    ("arrow", 26, "white"), ("play", 20, "black"), ("download", 20, "black"), ("download", 20, "white"),
-    ("refresh", 20, "white"), ("refresh", 22, "white"), ("trash", 20, "orange"), ("eye", 24, "white"),
-    ("eye_off", 24, "white"), ("check", 40, "orange"), ("close", 40, "grey"), ("chip", 22, "grey"),
-    ("id", 22, "grey"), ("storage", 22, "grey"), ("terminal", 22, "grey"), ("wifi", 22, "grey"),
-    ("scan", 20, "grey"), ("flag", 24, "white"), ("agent", 24, "white"), ("hash", 24, "white"),
-    ("support", 24, "white"), ("replay", 20, "white"), ("power", 20, "orange"), ("close", 20, "white"),
+    # Headers, status row and navigation.
+    ("back", 22, "white"), ("help", 22, "white"), ("settings", 22, "white"), ("chevron", 18, "dim"),
+    ("wifi", 22, "white"), ("wifi_off", 22, "grey"), ("robot", 22, "orange"), ("robot", 22, "grey"),
+    ("battery_full", 22, "white"), ("battery_mid", 22, "white"), ("battery_low", 22, "orange"),
+    ("battery_charging", 22, "white"),
+    # Library filters, rows and favorites.
+    ("star", 18, "white"), ("star_fill", 18, "black"), ("grid", 18, "white"), ("grid", 18, "black"),
+    ("star", 22, "white"),
+    ("star_fill", 22, "orange"), ("grid", 22, "white"),
+    *[(name, 22, "white") for name in ("display", "audio", "house", "sensor", "chat", "motor")],
+    # Actions.
+    ("download", 20, "black"), ("download", 20, "white"), ("code", 20, "white"), ("play", 20, "black"),
+    ("refresh", 20, "white"), ("trash", 20, "orange"), ("replay", 20, "white"), ("backspace", 26, "white"),
+    ("arrow", 26, "white"), ("expand", 16, "grey"), ("eye", 24, "white"), ("eye_off", 24, "white"),
+    # Pages: develop, device, help, guide, progress and results.
+    ("usb", 22, "grey"), ("wifi", 22, "grey"), ("pin", 22, "grey"), ("key", 22, "grey"),
+    ("chip", 22, "grey"), ("id", 22, "grey"), ("storage", 22, "grey"), ("flag", 24, "white"),
+    ("code", 24, "white"), ("hash", 24, "white"), ("support", 24, "white"), ("download", 24, "white"),
+    ("power", 20, "orange"), ("check", 40, "orange"), ("close", 40, "grey"),
 ]
 COLORS = {"white": WHITE, "grey": GREY, "dim": DIM, "black": BLACK, "orange": ORANGE}
 
@@ -325,59 +421,35 @@ COLORS = {"white": WHITE, "grey": GREY, "dim": DIM, "black": BLACK, "orange": OR
 def build_icons() -> None:
     out = ASSETS / "icons"
     out.mkdir(parents=True, exist_ok=True)
+    for stale in out.glob("*.png"):
+        stale.unlink()
     for name, size, color in ICON_OUTPUTS:
         pen = Pen(size)
         ICONS[name](pen)
         pen.result(COLORS[color]).save(out / f"{name}-{size}-{color}.png", optimize=True)
     _empty_grid(56, GREY).save(out / "empty-56-grey.png", optimize=True)
-    build_guide_device(out)
-
-
-def build_guide_device(out: Path) -> None:
-    """Line drawing of the device for the "how to enter" guide page.
-
-    The AI key sits on the top edge and the power key on the bottom edge,
-    right side, as described by the product owner. Exact key positions must
-    be checked against the industrial design before release.
-    """
-    w, h, s = 200, 200, 8
-    img = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-
-    def box(x0, y0, x1, y1):
-        return (x0 * s, y0 * s, x1 * s, y1 * s)
-
-    d.rounded_rectangle(box(118 - 26, 8, 118 + 4, 22), 6 * s, fill=(*ORANGE, 255))   # AI key
-    d.rounded_rectangle(box(130, 178, 160, 192), 6 * s, fill=(*ORANGE, 255))         # power key
-    d.rounded_rectangle(box(22, 18, 178, 182), 30 * s, fill=(0, 0, 0, 255),
-                        outline=(*WHITE, 255), width=3 * s)                           # body
-    d.rounded_rectangle(box(40, 36, 160, 164), 16 * s, outline=(*DIM, 255), width=2 * s)
-    # A tiny dot-matrix "V" on the screen hints at the Vibe Mode boot screen.
-    for i, (cx, cy) in enumerate([(84, 84), (90, 96), (96, 108), (102, 120), (108, 108),
-                                  (114, 96), (120, 84)]):
-        r = 3.2
-        d.ellipse(box(cx - r, cy - r, cx + r, cy + r), fill=(*ORANGE, 255) if i == 3 else (*WHITE, 255))
-    img.resize((w, h), Image.LANCZOS).save(out / "guide-device-200.png", optimize=True)
 
 
 # --------------------------------------------------------------------------
-# QR codes: version 3, ECC M, 4 px modules, 4-module quiet zone = 148 px
+# QR codes: version 3, ECC L, 2-module quiet zone, one pixel per module
 # --------------------------------------------------------------------------
 def build_qr() -> None:
     import qrcode
 
     out = ASSETS / "qr"
     out.mkdir(parents=True, exist_ok=True)
+    for stale in out.glob("*.png"):
+        stale.unlink()
     for name, url in QR_CODES.items():
-        if len(url.encode()) > 42:
-            raise SystemExit(f"{name}: {url} exceeds QR version 3-M byte capacity")
-        qr = qrcode.QRCode(version=3, error_correction=qrcode.constants.ERROR_CORRECT_M,
-                           box_size=4, border=4, mask_pattern=0)
+        if len(url.encode()) > 53:
+            raise SystemExit(f"{name}: {url} exceeds the QR version 3-L byte capacity (53)")
+        qr = qrcode.QRCode(version=QR_VERSION, error_correction=qrcode.constants.ERROR_CORRECT_L,
+                           box_size=1, border=QR_BORDER)
         qr.add_data(url, optimize=0)
         qr.make(fit=False)
         image = qr.make_image(fill_color="black", back_color="white").convert("1")
-        assert image.size == (148, 148), image.size
-        image.save(out / f"{name}-148.png", optimize=True)
+        assert image.size == (QR_MODULES, QR_MODULES), image.size
+        image.save(out / f"{name}.png", optimize=True)
 
 
 def main() -> None:
