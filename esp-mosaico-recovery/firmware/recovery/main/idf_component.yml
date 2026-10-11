@@ -13,4 +13,5 @@ dependencies:
     version: "^1.7.19"
   joltwallet/littlefs:
     version: "^1.22.0"
-  espressif/esp-gsp: "==1.4.0"
+  # bsp/display.h includes esp_lcd_touch.h; Vibe View reads points with get_data().
+  espressif/esp_lcd_touch: "^1.2.0"

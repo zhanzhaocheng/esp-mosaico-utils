@@ -1,11 +1,10 @@
-"""Exercise the production GSP scenes and C controller through native input."""
+"""Exercise the production Vibe View scene and C controller through native input."""
 import json
 import os
 from pathlib import Path
-import socket
+import re
+import shutil
 import subprocess
-import sys
-import time
 
 import pytest
 from PIL import Image
@@ -13,138 +12,134 @@ import zxingcpp
 
 ROOT = Path(__file__).resolve().parents[1]
 RECOVERY = ROOT / "firmware/recovery"
+FRAME_MS = 16
+BINDS = dict(re.findall(r"VIBE_BIND_(\w+) = (\d+),",
+                        (RECOVERY / "ui/generated/vibe_scene.h").read_text(encoding="utf-8")))
 
 
 class Simulator:
-    def __init__(self, directory, executable, bundle, host, scenario=""):
+    """Drive the native simulator over stdin/stdout with simulated time."""
+
+    def __init__(self, directory, executable, scenario=""):
         self.directory = directory
-        self.state_file = directory / "state.json"
-        self.log = (directory / "sim.log").open("w")
-        ready = directory / "ready.json"
-        self.sim = subprocess.Popen([
-            str(host), "--bundle", str(bundle), "--headless", "--backend-enable",
-            "--backend-required", "--api-listen", "tcp://127.0.0.1:0",
-            "--ready-file", str(ready)], stdout=self.log, stderr=self.log)
-        self.backend = None
-        self.connection = None
-        self.stream = None
-        self.sequence = 0
+        self.log_path = directory / "sim.log"
+        self.log = self.log_path.open("w")
+        self.process = subprocess.Popen(
+            [str(executable)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log,
+            env=dict(os.environ, VIBE_SIM_SCENARIO=scenario), universal_newlines=True, bufsize=1)
         try:
-            deadline = time.monotonic() + 20
-            while not ready.exists():
-                assert self.sim.poll() is None, "simulator exited before ready"
-                assert time.monotonic() < deadline, "simulator startup timed out"
-                time.sleep(.05)
-            info = json.loads(ready.read_text())
-            self.backend = subprocess.Popen([str(executable), "--endpoint", info["backend"]],
-                env=dict(os.environ, VIBE_SIM_STATE_FILE=str(self.state_file),
-                    VIBE_SIM_CONTROL_FILE=str(directory / "control"), VIBE_SIM_SCENARIO=scenario),
-                stdout=self.log, stderr=self.log)
-            address, port = info["api"].replace("tcp://", "").split(":")
-            self.connection = socket.create_connection((address, int(port)), timeout=15)
-            self.stream = self.connection.makefile("rb")
-            self.wait(page=0)
+            ready = self.process.stdout.readline().strip()
+            assert ready == "ready", self.diagnostics()
         except BaseException:
             self.close()
             raise
 
-    def rpc(self, method, **params):
-        self.sequence += 1
-        body = json.dumps(dict(jsonrpc="2.0", id=self.sequence, method=method, params=params)).encode()
-        self.connection.sendall(("Content-Length: %d\r\n\r\n" % len(body)).encode() + body)
-        while True:
-            headers = {}
-            while True:
-                line = self.stream.readline()
-                assert line, "simulator disconnected"
-                if line in (b"\r\n", b"\n"):
-                    break
-                key, value = line.decode().split(":", 1)
-                headers[key.lower()] = value.strip()
-            result = json.loads(self.stream.read(int(headers["content-length"])))
-            if result.get("id") == self.sequence:
-                assert "error" not in result, result
-                return result.get("result")
+    def diagnostics(self):
+        self.log.flush()
+        return self.log_path.read_text()
+
+    def command(self, line):
+        assert self.process.poll() is None, self.diagnostics()
+        self.process.stdin.write(line + "\n")
+        self.process.stdin.flush()
+        reply = self.process.stdout.readline()
+        assert reply, "simulator exited: " + self.diagnostics()
+        reply = reply.rstrip("\n")
+        assert not reply.startswith("error"), (line, reply)
+        return reply
+
+    def frames(self, count):
+        self.command("wait %d" % count)
+
+    def advance(self, seconds):
+        self.frames(int(seconds * 1000 / FRAME_MS) + 1)
+
+    def state(self):
+        return json.loads(self.command("state"))
 
     def wait(self, *, timeout=15, **expected):
-        deadline = time.monotonic() + timeout
-        actual = {}
-        while time.monotonic() < deadline:
-            assert self.backend.poll() is None, (self.directory / "sim.log").read_text()
-            try:
-                snapshot = self.state_file.read_text(encoding="utf-8")
-            except (FileNotFoundError, PermissionError):
-                # Windows briefly denies reads while MoveFileEx replaces the
-                # snapshot. Retry within the same deadline, never reset it.
-                pass
-            else:
-                actual = json.loads(snapshot)
-                if all(actual.get(k) == v for k, v in expected.items()):
-                    # Let already-enqueued visibility and list updates paint.
-                    self.rpc("wait", frames=20)
-                    return actual
-            time.sleep(.05)
-        pytest.fail("expected %r; observed %r; %s" % (expected, actual, (self.directory / "sim.log").read_text()))
+        """Poll state while simulated time advances; timeout is simulated seconds."""
+        actual, elapsed = {}, 0
+        while elapsed <= timeout * 1000:
+            actual = self.state()
+            if all(actual.get(k) == v for k, v in expected.items()):
+                # Let already-enqueued visibility and list updates paint.
+                self.frames(20)
+                return actual
+            self.frames(3)
+            elapsed += 3 * FRAME_MS
+        pytest.fail("expected %r; observed %r; %s" % (expected, actual, self.diagnostics()))
 
     def tap(self, x, y):
-        self.rpc("tap", x=x, y=y)
-        self.rpc("wait", frames=8)
+        self.command("tap %d %d" % (x, y))
+        self.frames(8)
+
+    def text(self, bind):
+        return self.command("text " + BINDS[bind])
+
+    def drag(self, x, start_y, end_y, step=10):
+        self.command("press %d %d" % (x, start_y))
+        self.frames(1)
+        direction = -step if end_y < start_y else step
+        for y in range(start_y + direction, end_y + direction, direction):
+            self.command("move %d %d" % (x, y))
+            self.frames(1)
+        self.command("release")
+        self.frames(60)
+
+    def screenshot(self, path, image_format):
+        self.command("screenshot %s %s" % (image_format, path))
 
     def capture(self, name):
-        self.rpc("screenshot", path=str(self.directory / (name + ".png")), format="png")
+        self.screenshot(self.directory / (name + ".png"), "png")
 
     def open_bridge(self):
         # Same public controller entry used by the device's queued USB RPC.
         self.control("open-bridge")
 
     def control(self, command):
-        request = self.directory / "control"
-        temporary = self.directory / "control.tmp"
-        temporary.write_text(command)
-        temporary.replace(request)
-        deadline = time.monotonic() + 5
-        while request.exists():
-            assert time.monotonic() < deadline
-            time.sleep(.05)
-        self.rpc("wait", frames=20)
+        self.command("control " + command)
+        self.frames(20)
 
     def close(self):
-        if self.stream:
-            self.stream.close()
-        if self.connection:
-            self.connection.close()
-        # Stop backend first: deinit can still communicate with the renderer.
-        for process in (self.backend, self.sim):
-            if process and process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
+        if self.process.poll() is None:
+            try:
+                self.process.stdin.write("quit\n")
+                self.process.stdin.flush()
+                self.process.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                self.process.kill()
+                self.process.wait()
+        for stream in (self.process.stdin, self.process.stdout):
+            if stream:
+                stream.close()
         self.log.close()
+
+
+def build_simulator(build):
+    cmake = shutil.which("cmake")
+    assert cmake, "The native Vibe View simulator requires CMake and a C compiler"
+    configure = [cmake, "-S", str(RECOVERY / "pc"), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release"]
+    if shutil.which("ninja"):
+        configure += ["-G", "Ninja"]
+    for command in (configure, [cmake, "--build", str(build), "--config", "Release"]):
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                universal_newlines=True, timeout=300)
+        assert result.returncode == 0, result.stdout
+    name = "vibe_sim.exe" if os.name == "nt" else "vibe_sim"
+    candidates = sorted(build.rglob(name))
+    assert candidates, "simulator executable was not produced"
+    return candidates[0]
 
 
 @pytest.fixture(scope="module")
 def native_build(tmp_path_factory):
-    component = Path(os.environ.get("ESP_GSP_COMPONENT_DIR", RECOVERY / "managed_components/espressif__esp-gsp"))
-    assert (component / "tools/sim_bridge/build.py").is_file(), "Build Recovery first or set ESP_GSP_COMPONENT_DIR"
-    build = tmp_path_factory.mktemp("vibe-native-build")
-    gspc = os.environ.get("GSPC_EXECUTABLE")
-    host = os.environ.get("GSP_SIM_EXECUTABLE")
-    assert gspc and host, "Set GSPC_EXECUTABLE and GSP_SIM_EXECUTABLE to the pinned GSP tools"
-    build_python = os.environ.get("GSP_BUILD_PYTHON", sys.executable)
-    result = subprocess.run([build_python, str(component / "tools/sim_bridge/build.py"),
-        "--project", str(RECOVERY / "pc"), "--build-dir", str(build),
-        "--component-dir", str(component), "--gspc", gspc], capture_output=True, text=True, timeout=180)
-    assert result.returncode == 0, result.stdout + result.stderr
-    manifest = json.loads((build / "vibe_backend-Release.json").read_text())
-    return Path(manifest["executable"]), Path(manifest["bundle"]), Path(host)
+    return build_simulator(tmp_path_factory.mktemp("vibe-native-build"))
 
 
 @pytest.fixture
 def sim(tmp_path, native_build, request):
-    instance = Simulator(tmp_path, *native_build, scenario=getattr(request, "param", ""))
+    instance = Simulator(tmp_path, native_build, scenario=getattr(request, "param", ""))
     try:
         yield instance
     finally:
@@ -215,7 +210,7 @@ def test_wifi_cards_and_labels_survive_navigation_and_rescan(sim):
     def check_frame(name):
         sim.capture(name)
         path = sim.directory / (name + ".ppm")
-        sim.rpc("screenshot", path=str(path), format="ppm")
+        sim.screenshot(path, "ppm")
         with path.open("rb") as frame:
             assert frame.readline().strip() == b"P6"
             assert frame.readline().split() == [b"480", b"480"]
@@ -264,13 +259,12 @@ def test_nand_update_and_result_acknowledgement(sim):
     sim.tap(350, 430)
     sim.wait(page=7)
     sim.capture("update")
-    # Twenty asynchronous service ticks each issue renderer RPCs. macOS CI
-    # can exceed 15 wall-clock seconds while still advancing normally.
+    # Twenty service ticks of 250 ms complete the simulated NAND component.
     sim.wait(timeout=45, page=8, progress=1000)
     sim.capture("result")
     sim.tap(240, 409)
     sim.wait(page=0)
-    time.sleep(.6)
+    sim.advance(.6)
     sim.wait(page=0)  # an acknowledged terminal result must not reopen
 
 
@@ -302,7 +296,7 @@ def test_update_failure_returns_home_without_reopening(sim):
     sim.capture("update-failure")
     sim.tap(240, 409)
     sim.wait(page=0)
-    time.sleep(.6)
+    sim.advance(.6)
     sim.wait(page=0)
 
 
@@ -389,3 +383,44 @@ def test_ota_telemetry_component_transition_stall_retry_and_terminal_states(sim)
     sim.capture("ota-failed-after-transfer")
     sim.tap(240, 409)
     sim.wait(page=0)
+
+
+def test_wifi_list_drag_scroll_selects_offscreen_network(sim):
+    sim.tap(75, 445)
+    sim.wait(page=1)
+    sim.drag(240, 420, 190)
+    sim.capture("wifi-scrolled")
+    sim.tap(180, 251)  # The first visible card is now the fourth network.
+    sim.wait(page=2)
+    assert sim.text("SSID") == "Studio network 4"
+    sim.tap(38, 36)
+    sim.wait(page=1)
+    sim.drag(240, 240, 430)  # Scroll back to the top.
+    sim.tap(180, 251)
+    sim.wait(page=2)
+    assert sim.text("SSID") == "Studio network 1"
+
+
+def test_keyboard_symbol_pages_and_shift(sim):
+    sim.tap(75, 445)
+    sim.wait(page=1)
+    sim.tap(180, 251)
+    sim.wait(page=2)
+    sim.tap(47, 434)   # Mode key: symbols page.
+    sim.tap(24, 260)   # 1
+    sim.tap(36, 376)   # More symbols.
+    sim.capture("keyboard-more-symbols")
+    sim.tap(24, 260)   # [
+    sim.tap(225, 434)  # Space
+    sim.tap(47, 434)   # Letters again.
+    sim.tap(36, 376)   # Shift.
+    sim.tap(24, 260)   # Q
+    sim.tap(36, 376)   # Shift off.
+    sim.tap(24, 260)   # q
+    sim.wait(password_length=5)
+    sim.tap(414, 146)  # Show the typed password.
+    sim.wait(password_visible=True)
+    assert sim.text("PASSWORD_DISPLAY") == "1[ Qq"
+    sim.tap(431, 376)  # Backspace removes the last character.
+    sim.wait(password_length=4)
+    assert sim.text("PASSWORD_DISPLAY") == "1[ Q"

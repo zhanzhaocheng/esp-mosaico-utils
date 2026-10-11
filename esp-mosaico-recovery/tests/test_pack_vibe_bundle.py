@@ -9,12 +9,13 @@ import zlib
 
 def test_embedded_bundle_is_lossless_and_never_larger_than_zlib(tmp_path):
     tool = Path(__file__).resolve().parents[1] / "firmware/recovery/tools/pack_vibe_bundle.py"
-    # Include binary values, repeated scene-like records and glyph-like data.
-    raw = bytes(range(256)) * 32 + b"scene\x00font\x00bind\x00" * 1024
-    source = tmp_path / "bundle.gspb"
+    # Include binary values, repeated record-like and glyph-like data.
+    raw = bytes(range(256)) * 32 + b"glyph\x00font\x00bind\x00" * 1024
+    source = tmp_path / "vibe_assets.bin"
     output = tmp_path / "bundle.c"
     source.write_bytes(raw)
-    python = os.environ.get("GSP_BUILD_PYTHON", sys.executable)
+    # zopfli needs Python 3.10+; CI points this at its build interpreter.
+    python = os.environ.get("RECOVERY_BUILD_PYTHON") or os.environ.get("GSP_BUILD_PYTHON") or sys.executable
     result = subprocess.run([python, str(tool), str(source), str(output)],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr

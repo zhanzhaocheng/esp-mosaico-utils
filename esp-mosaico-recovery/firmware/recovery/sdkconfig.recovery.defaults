@@ -44,6 +44,10 @@ CONFIG_ESP_IRIS_RECOVERY_ABI=2
 CONFIG_ESP_IRIS_HEALTH_TIMEOUT_MS=45000
 
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+# The Bridge is one HTTPS origin. Trust the 35 most common public roots instead
+# of all 121; once the origin's CA is confirmed, a custom bundle of its roots
+# plus independent backups can replace this set.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 # Bridge keeps a download and a cancellation TLS connection alive together.
 # Recovery has PSRAM XIP enabled; leave internal/DMA RAM for Wi-Fi and AES.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y

@@ -15,6 +15,9 @@ All notable ESP-Iris component changes are documented in this file.
 
 - Include the prebuilt Web Workbench, so a source checkout can serve the UI
   without Node.js. Verify in CI that rebuilding matches the committed files.
+- Keep the console and data runtimes in `.bss` and set their non-zero defaults
+  in a constructor before `app_main`. Their embedded wire frames no longer
+  occupy about 11 KiB of zeros each in the application image.
 
 ## 0.1.0 - 2026-09-10
 

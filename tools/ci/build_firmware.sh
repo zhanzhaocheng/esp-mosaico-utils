@@ -79,6 +79,18 @@ build_system() {
         -B "$recovery_build" \
         -D "SDKCONFIG=$recovery_build/sdkconfig" \
         build
+    report_recovery_size "$recovery_build"
+}
+
+# Record the fixed-slot image composition next to the uploaded ELF. LTO folds
+# components into link-time partitions, so per-archive rows are approximate.
+report_recovery_size() {
+    local build="$1"
+    local project="$repository_root/esp-mosaico-recovery/firmware/recovery"
+    idf.py -C "$project" -B "$build" -D "SDKCONFIG=$build/sdkconfig" size \
+        | tee "$build/size.txt"
+    idf.py -C "$project" -B "$build" -D "SDKCONFIG=$build/sdkconfig" \
+        size-components --format json --output-file "$build/size-components.json"
 }
 
 check_artifact_budgets() {

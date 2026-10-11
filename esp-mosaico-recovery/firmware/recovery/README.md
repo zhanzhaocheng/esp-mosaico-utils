@@ -34,7 +34,8 @@ panic/watchdog 跳过正常 shutdown 的路径；Iris 在正常软件重启前�
 可能与新应用代码重叠。Vibe Mode 的 panic 处理器放入内部 RAM，以保留
 Flash/cache 故障的诊断能力。USB Serial/JTAG 控制器不受此处理影响。
 
-构建仍使用锁定 ESP-IDF、GSP 1.4.0 与 GSPC 0.5.0。`recovery-current-bundle`
+构建使用锁定 ESP-IDF；界面由工程内的 Vibe View C 渲染器绘制，不再依赖
+GSP/GSPC，详见下文“Vibe Mode 界面与构建”。`recovery-current-bundle`
 仅生成未评审候选；完成设备身份、各启动入口、更新、回退及原生工具实测前，
 不得运行 `update-recovery-prebuilt` 发布候选。产品原生应用 flash 不写维护镜像；
 本维护工程自身的 flash 清单明确将 `factory.bin` 写入 `vibe_mode`。
@@ -304,7 +305,7 @@ Vibe Mode 的普通 `malloc` 优先使用 PSRAM，并保留 64 KiB 片内分配�
 速率。任务内存观察接口保持启用，可结合日志区分网络等待、Flash 写入和内存压力。
 
 Vibe Mode 支持 Gateway Web 工作台截图，以及 USB 会话下的交互输入。
-触摸输入使用 Gateway 的 `0x1001/1` pointer RPC，交由 GSP 输入处理按下、移动和抬起；TCP 会话不能通过此接口操作 Vibe Mode 界面。
+触摸输入使用 Gateway 的 `0x1001/1` pointer RPC，交由 Vibe View 输入处理按下、移动和抬起；TCP 会话不能通过此接口操作 Vibe Mode 界面。
 
 ```sh
 python mosaico.py iris test recovery-wifi --ssid SSID
@@ -410,37 +411,43 @@ ESP-Mosaico workspace 时，`mosaico.py recover` 会根据宿主 workspace 的
 用户可见名称为 **Vibe Mode**；工程 `factory`、协议角色 `recovery`、
 `recover` 命令和 Recovery ABI 1 保持不变；当前源码固件版本为 `0.1.4`。
 九个页面由 `ui/main.json` 和可移植的 `main/vibe_ui.c` 实现，PC 与设备共享
-同一控制器及 `ui/profile.yaml` RGB565 编译配置。
-`main/factory_ui.c` 适配网络、Bridge、NAND 和更新状态；
-异步状态在 GSP 渲染上下文汇总，外部打开下载页的请求通过队列提交。
+同一控制器和 `components/vibe_view` C 渲染器。`main/factory_ui.c` 适配网络、
+Bridge、NAND 和更新状态；异步状态在 UI 任务汇总，外部打开下载页的请求
+通过队列提交。
 
-使用 Component Registry 的 **ESP-GSP 1.4.0**，BSP 开启硬件显示但关闭
-`CONFIG_BSP_DISPLAY_LVGL_ENABLE`。该 BSP 选项默认开启，保留现有 LVGL
-应用行为。构建必须使用包含该选项的 workspace BSP；旧版 BSP 不支持此模式。
-GSP 在调用方同步创建、校验 UI，Vibe Mode 将
-`CONFIG_ESP_MAIN_TASK_STACK_SIZE` 设为 20480；仅增加渲染任务栈不能覆盖该阶段。
-启动日志记录 UI 初始化后的主任务栈余量，便于检查后续资源改动。
+Vibe View 是为固定场景编写的 RGB565 渲染器：抗锯齿圆角矩形、4-bit 字形、
+1-bit 二维码与 A8 图标、列表拖动与惯性滚动、键盘、进度条和脏矩形刷新。
+`tools/gen_vibe_view.py` 由 `ui/main.json` 生成场景表与绑定 ID，并用 Pillow
+按各标签的 `font_charset` 预烘焙字形，输出提交在 `ui/generated/`，固件构建
+不依赖 Pillow 或 FreeType。修改场景、字体或图片后须重新运行该脚本并提交结果；
+`tests/test_vibe_view_assets.py` 校验输入哈希、字形覆盖与资源 CRC。
+BSP 开启硬件显示但关闭 `CONFIG_BSP_DISPLAY_LVGL_ENABLE`，该 BSP 选项默认
+开启，保留现有 LVGL 应用行为；构建必须使用包含该选项的 workspace BSP。
 
-场景、字形与键盘图标全部嵌入 Vibe Mode，不依赖应用资源分区。
-GSPB 在构建时无损 Deflate 压缩，启动时使用 ROM 解压器还原到 PSRAM；
-GSP 继续执行原始 bundle 校验。界面仅使用预烘焙字形，不启用运行时字体；
-通过 `CONFIG_ESP_GSP_ENABLE_JPEG=n` 排除 JPEG 解码器，
-现有图标仍为编译后的 RGB565_A8。32 px 更新标题与百分比只打包对应状态文案
-和数字所需的字形，网络名称与密码仍保留完整的既有字符集。
-若增加运行时字体或 JPEG 图片，必须同步启用相应能力并重新验证大小和功能。
-原生键盘支持大小写、符号、删除、确认、密码显示切换和 64 字节上限，
-离开输入页会清理密码。
+UI 任务使用 8 KiB 片内栈：按键回调会同步保存或擦除 NVS 中的 Wi-Fi 凭据。
+帧缓冲位于 PSRAM，变化区域按 CO5300 的 4 列对齐，在 TE 脉冲后经 QSPI DMA
+发送；Iris 截图直接复制该帧缓冲，不再保留影子帧。启动日志记录主任务栈余量，
+便于检查后续资源改动。
 
-在宿主 workspace 中启动共享控制器的模拟器：
+场景、字形与键盘图标全部嵌入 Vibe Mode，不依赖应用资源分区。资源块在构建时
+经 Zopfli 无损压缩，启动时使用 ROM 解压器还原到 PSRAM，并由 CRC 校验。
+32/40 px 字号只打包对应状态文案、数字和配对码所需的字形，网络名称与密码
+仍保留完整的 ASCII 字符集。键盘支持大小写、两页符号（覆盖全部可打印 ASCII）、
+删除、确认、密码显示切换和 64 字节上限，离开输入页会清理密码。
+
+主机模拟器是一个原生程序，用模拟时间运行同一份场景、渲染器和控制器
+（在本目录执行）：
 
 ```sh
-python3 tools/gsp-sim/run.py submodule/esp-mosaico-utils/esp-mosaico-recovery/firmware/recovery/ui/main.json --headless
+cmake -S pc -B build-sim && cmake --build build-sim
+printf 'wait 30\nscreenshot png home.png\nquit\n' | build-sim/vibe_sim
 ```
 
-运行 Vibe Mode 主机测试前，设置 `GSPC_EXECUTABLE`（0.5.0）和
-`GSP_SIM_EXECUTABLE`（1.4.0），安装 `tests/requirements-ui.txt` 中的主机依赖。
-原生模拟器测试使用真实键盘、列表和回调，
-并检查 Wi-Fi 列表的截图像素，覆盖字形完整性、卡片间距和反复导航。
+命令从标准输入逐行读取（`tap`、`press`/`move`/`release`、`wait`、
+`screenshot`、`state`、`control`），`VIBE_SIM_SCENARIO` 选择模拟场景。
+运行 Vibe Mode 主机测试只需 CMake、C 编译器和 `tests/requirements-ui.txt`
+中的依赖。测试使用真实键盘、列表和回调，检查 Wi-Fi 列表的截图像素、
+拖动滚动与键盘符号页，覆盖字形完整性、卡片间距和反复导航。
 二维码由独立解码器直接从渲染截图验证；OTA 使用确定性的时间与字节数序列，
 覆盖组件切换、停滞、重试、新任务、未知大小及传输完成后的提交失败。
 服务数据由 PC 后端模拟；模拟通过不代表真机网络或更新验收通过。
@@ -449,7 +456,7 @@ python3 tools/gsp-sim/run.py submodule/esp-mosaico-utils/esp-mosaico-recovery/fi
 需要重新生成时，在主机安装 `tools/requirements-qr.txt`，运行
 `python tools/generate_ideas_qr.py`。脚本固定完整 HTTPS URL、QR version 3、
 M 级纠错、四模块白边和 5 倍整数缩放，生成 185×185 PNG；普通构建直接使用
-该文件，经现有 GSPB 与 Zopfli 压缩链路嵌入固件。
+该文件，经 `tools/gen_vibe_view.py` 转为 1-bit 图像并随资源块压缩嵌入固件。
 
 固定 Vibe Mode 槽仍为 `0x20000` / `0x1c0000`。须核对实际构建目录中的
 `factory.bin` 大小；不能仅凭 IDF 构建成功判断镜像适合较小的 factory 槽。

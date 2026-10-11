@@ -21,7 +21,7 @@ def test_recovery_resilience(tmp_path, kind, source):
     cc = shutil.which("cc")
     assert cc, "Recovery service regression tests require a C compiler"
     headers = re.findall(r'#include "([^"]+)"', (MAIN / source).read_text())
-    headers += ["esp_err.h", "esp_gsp.h", "esp_iris_system_inventory.h"]
+    headers += ["esp_err.h", "esp_iris_system_inventory.h"]
     for name in headers:
         if name.startswith(("factory_", "recovery_", "vibe_")):
             continue
@@ -32,6 +32,7 @@ def test_recovery_resilience(tmp_path, kind, source):
     command = [cc, "-std=c11", "-D_POSIX_C_SOURCE=200809L", "-Wall", "-Wextra",
                "-Werror", "-Wno-unused-parameter", f'-DSOURCE="{(MAIN / source).as_posix()}"',
                "-I" + str(tmp_path), "-I" + str(FIXTURE), "-I" + str(MAIN),
+               "-I" + str(ROOT / "firmware/recovery/components/vibe_view/include"),
                "-I" + str(ROOT / "include"), str(FIXTURE / (kind + ".c")),
                str(FIXTURE / "sdk.c"), "-o", str(output)]
     if os.environ.get("IRIS_HOST_SANITIZERS") == "1":

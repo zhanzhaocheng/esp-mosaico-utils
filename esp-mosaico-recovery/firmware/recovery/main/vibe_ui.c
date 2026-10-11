@@ -3,10 +3,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#define GSP_BUNDLE_ENABLE_RAW_IDS
-#include "bundle_gsp.h"
+#include "vibe_scene.h"
 
-#define TEXT(s, name, value) esp_gsp_set_text((s)->ui, GSP_VIBE_BIND_##name, value)
+#define TEXT(s, name, value) vv_set_text((s)->ui, VIBE_BIND_##name, value)
 static void format(vibe_ui_t *s, uint16_t bind, const char *fmt, ...)
 {
     char text[192];
@@ -14,9 +13,9 @@ static void format(vibe_ui_t *s, uint16_t bind, const char *fmt, ...)
     va_start(args, fmt);
     vsnprintf(text, sizeof(text), fmt, args);
     va_end(args);
-    (void)esp_gsp_set_text(s->ui, bind, text);
+    (void)vv_set_text(s->ui, bind, text);
 }
-#define FORMAT(s, name, ...) format(s, GSP_VIBE_BIND_##name, __VA_ARGS__)
+#define FORMAT(s, name, ...) format(s, VIBE_BIND_##name, __VA_ARGS__)
 static void transfer_text(vibe_ui_t *s)
 {
     const vibe_snapshot_t *v = &s->snapshot;
@@ -32,7 +31,7 @@ static void transfer_text(vibe_ui_t *s)
         TEXT(s, UPDATE_PERCENT, "--");
         FORMAT(s, UPDATE_BYTES, "%u.%02u %s / --", received / 100, received % 100, suffix);
     }
-    (void)esp_gsp_set_value(s->ui, GSP_VIBE_BIND_PROGRESS, vibe_transfer_permille(t->received, t->total) / 10);
+    (void)vv_set_value(s->ui, VIBE_BIND_PROGRESS, vibe_transfer_permille(t->received, t->total) / 10);
     const char *verb = !strcmp(v->update_owner, "Bridge") ? "Download" : !strcmp(v->update_owner, "NAND") ? "Read" : "Receive";
     if (!s->rate.valid) FORMAT(s, UPDATE_RATE, "%s: --", verb);
     else {
@@ -60,11 +59,11 @@ static void clear_secret(char *text, size_t size)
 static void show(vibe_ui_t *s, vibe_page_t page)
 {
     static const uint16_t visibility[VIBE_PAGE_COUNT] = {
-        GSP_VIBE_BIND_HOME_VISIBLE, GSP_VIBE_BIND_WIFI_VISIBLE,
-        GSP_VIBE_BIND_PASSWORD_VISIBLE, GSP_VIBE_BIND_PAIRING_VISIBLE,
-        GSP_VIBE_BIND_BRIDGE_VISIBLE, GSP_VIBE_BIND_NAND_VISIBLE,
-        GSP_VIBE_BIND_CONFIRM_VISIBLE, GSP_VIBE_BIND_UPDATE_VISIBLE,
-        GSP_VIBE_BIND_RESULT_VISIBLE,
+        VIBE_BIND_HOME_VISIBLE, VIBE_BIND_WIFI_VISIBLE,
+        VIBE_BIND_PASSWORD_VISIBLE, VIBE_BIND_PAIRING_VISIBLE,
+        VIBE_BIND_BRIDGE_VISIBLE, VIBE_BIND_NAND_VISIBLE,
+        VIBE_BIND_CONFIRM_VISIBLE, VIBE_BIND_UPDATE_VISIBLE,
+        VIBE_BIND_RESULT_VISIBLE,
     };
     const vibe_page_t previous = s->page;
     if (previous == VIBE_PASSWORD && page != VIBE_PASSWORD) {
@@ -81,14 +80,14 @@ static void show(vibe_ui_t *s, vibe_page_t page)
     /* Authored layers start with only HOME visible. Update only the two
      * participating layers, avoiding redundant visibility invalidations. */
     if (previous != page)
-        (void)esp_gsp_set_visible(s->ui, visibility[previous], false);
-    (void)esp_gsp_set_visible(s->ui, visibility[page], true);
+        (void)vv_set_visible(s->ui, visibility[previous], false);
+    (void)vv_set_visible(s->ui, visibility[page], true);
     if (page == VIBE_WIFI) {
         TEXT(s, WIFI_NOTE, s->download_pending ? "Connect Wi-Fi to download ideas" : "USB remains available offline");
-        (void)esp_gsp_list_refresh(s->ui, s->networks);
+        (void)vv_list_refresh(s->ui, s->networks);
         if (previous != page) (void)command(s, VIBE_SCAN_WIFI, NULL, NULL);
     }
-    if (page == VIBE_NAND) (void)esp_gsp_list_refresh(s->ui, s->bundles);
+    if (page == VIBE_NAND) (void)vv_list_refresh(s->ui, s->bundles);
 }
 static void error_result(vibe_ui_t *s, const char *title, int error)
 {
@@ -98,7 +97,7 @@ static void error_result(vibe_ui_t *s, const char *title, int error)
 }
 int vibe_ui_open_bridge(vibe_ui_t *s)
 {
-    if (!s || !s->ui) return ESP_GSP_ERR_INVALID_ARG;
+    if (!s || !s->ui) return VV_ERR_INVALID_ARG;
     s->services.snapshot(s->services.ctx, &s->snapshot);
     if (s->snapshot.bridge_running && s->page == VIBE_BRIDGE) return s->snapshot.bridge_error;
     int err = command(s, VIBE_OPEN_BRIDGE, NULL, NULL);
@@ -106,27 +105,27 @@ int vibe_ui_open_bridge(vibe_ui_t *s)
     vibe_ui_poll(s);
     return err;
 }
-static gsp_err_t network_row(esp_gsp_handle_t ui, esp_gsp_row_t row, uint32_t index, void *ctx)
+static vv_err_t network_row(vv_view_t *ui, vv_row_t row, uint32_t index, void *ctx)
 {
     vibe_ui_t *s = ctx;
-    if (index >= s->snapshot.ap_count) return GSP_ERR_INVALID_ARG;
+    if (index >= s->snapshot.ap_count) return VV_ERR_INVALID_ARG;
     const vibe_ap_t *ap = &s->snapshot.aps[index];
     char detail[48];
     snprintf(detail, sizeof(detail), "%s - %d dBm", ap->open ? "Open" : "Secured", ap->rssi);
-    esp_gsp_err_t err = gsp_vibe_networks_row_row_set_networks_title_text(ui, row, ap->ssid);
-    if (err == ESP_GSP_OK) err = gsp_vibe_networks_row_row_set_networks_detail_text(ui, row, detail);
-    return err == ESP_GSP_OK ? GSP_OK : GSP_ERR_INVALID_STATE;
+    vv_err_t err = vv_row_set_text(ui, row, VIBE_BIND_NETWORKS_TITLE, ap->ssid);
+    if (err == VV_OK) err = vv_row_set_text(ui, row, VIBE_BIND_NETWORKS_DETAIL, detail);
+    return err;
 }
-static gsp_err_t bundle_row(esp_gsp_handle_t ui, esp_gsp_row_t row, uint32_t index, void *ctx)
+static vv_err_t bundle_row(vv_view_t *ui, vv_row_t row, uint32_t index, void *ctx)
 {
     vibe_ui_t *s = ctx;
-    if (index >= s->snapshot.bundle_count) return GSP_ERR_INVALID_ARG;
+    if (index >= s->snapshot.bundle_count) return VV_ERR_INVALID_ARG;
     const vibe_bundle_t *bundle = &s->snapshot.bundles[index];
     char detail[64];
     snprintf(detail, sizeof(detail), "%u components - %lu KB", bundle->components, (unsigned long)(bundle->bytes / 1024));
-    esp_gsp_err_t err = gsp_vibe_bundles_row_row_set_bundles_title_text(ui, row, bundle->release);
-    if (err == ESP_GSP_OK) err = gsp_vibe_bundles_row_row_set_bundles_detail_text(ui, row, detail);
-    return err == ESP_GSP_OK ? GSP_OK : GSP_ERR_INVALID_STATE;
+    vv_err_t err = vv_row_set_text(ui, row, VIBE_BIND_BUNDLES_TITLE, bundle->release);
+    if (err == VV_OK) err = vv_row_set_text(ui, row, VIBE_BIND_BUNDLES_DETAIL, detail);
+    return err;
 }
 static void project_password(vibe_ui_t *s)
 {
@@ -152,51 +151,50 @@ static void submit_password(vibe_ui_t *s)
     if (err) TEXT(s, PASSWORD_ERROR, "Check password and try again");
     else show(s, s->download_pending ? VIBE_WIFI : VIBE_HOME);
 }
-static void event(esp_gsp_handle_t ui, const esp_gsp_event_t *e, void *ctx)
+static void event(vv_view_t *ui, const vv_event_t *e, void *ctx)
 {
     vibe_ui_t *s = ctx;
-    if (e->type != ESP_GSP_EVENT_CALL) return;
 #ifdef VIBE_UI_TRACE
-    fprintf(stderr, "vibe_event: action=%u list=%u item=%u page=%d networks=%u bundles=%u\n", e->action_id, e->list, (unsigned)e->item, s->page, s->networks, s->bundles);
+    fprintf(stderr, "vibe_event: action=%u list=%u item=%u page=%d networks=%u bundles=%u\n", e->action, e->list, (unsigned)e->item, s->page, s->networks, s->bundles);
 #endif
     if (s->snapshot.updating) return;
     int err;
-    switch (e->action_id) {
-    case GSP_VIBE_ACT_ID_DOWNLOAD:
+    switch (e->action) {
+    case VIBE_ACT_DOWNLOAD:
         if (s->snapshot.credentials_saved || s->snapshot.network == VIBE_NET_CONNECTED) {
             (void)vibe_ui_open_bridge(s);
         } else { s->download_pending = true; show(s, VIBE_WIFI); }
         break;
-    case GSP_VIBE_ACT_ID_WIFI: s->download_pending = false; show(s, VIBE_WIFI); break;
-    case GSP_VIBE_ACT_ID_PAIRING: show(s, VIBE_PAIRING); break;
-    case GSP_VIBE_ACT_ID_BACK_PASSWORD: show(s, VIBE_WIFI); break;
-    case GSP_VIBE_ACT_ID_BACK_CONFIRM:
-    case GSP_VIBE_ACT_ID_CANCEL_INSTALL: show(s, VIBE_NAND); break;
-    case GSP_VIBE_ACT_ID_HOME:
-    case GSP_VIBE_ACT_ID_BACK_WIFI:
-    case GSP_VIBE_ACT_ID_BACK_PAIRING:
-    case GSP_VIBE_ACT_ID_BACK_NAND:
-    case GSP_VIBE_ACT_ID_BACK_BRIDGE:
+    case VIBE_ACT_WIFI: s->download_pending = false; show(s, VIBE_WIFI); break;
+    case VIBE_ACT_PAIRING: show(s, VIBE_PAIRING); break;
+    case VIBE_ACT_BACK_PASSWORD: show(s, VIBE_WIFI); break;
+    case VIBE_ACT_BACK_CONFIRM:
+    case VIBE_ACT_CANCEL_INSTALL: show(s, VIBE_NAND); break;
+    case VIBE_ACT_HOME:
+    case VIBE_ACT_BACK_WIFI:
+    case VIBE_ACT_BACK_PAIRING:
+    case VIBE_ACT_BACK_NAND:
+    case VIBE_ACT_BACK_BRIDGE:
         s->acknowledged_update = s->snapshot.update_revision;
         show(s, VIBE_HOME); break;
-    case GSP_VIBE_ACT_ID_CANCEL_BRIDGE:
+    case VIBE_ACT_CANCEL_BRIDGE:
         (void)command(s, VIBE_STOP_BRIDGE, NULL, NULL);
         show(s, VIBE_HOME); break;
-    case GSP_VIBE_ACT_ID_SCAN:
+    case VIBE_ACT_SCAN:
         err = command(s, VIBE_SCAN_WIFI, NULL, NULL);
         if (err) FORMAT(s, WIFI_SCAN, "Scan error 0x%x", (unsigned)err);
         break;
-    case GSP_VIBE_ACT_ID_FORGET:
+    case VIBE_ACT_FORGET:
         (void)command(s, VIBE_STOP_BRIDGE, NULL, NULL);
         s->prefetch_attempted = false;
         (void)command(s, VIBE_FORGET_WIFI, NULL, NULL); break;
-    case GSP_VIBE_ACT_ID_NAND:
-    case GSP_VIBE_ACT_ID_NAND_SCAN:
+    case VIBE_ACT_NAND:
+    case VIBE_ACT_NAND_SCAN:
         show(s, VIBE_NAND);
         err = command(s, VIBE_SCAN_NAND, NULL, NULL);
         if (err) FORMAT(s, NAND_SCAN, "Scan error 0x%x", (unsigned)err);
         break;
-    case GSP_VIBE_ACT_ID_SELECT_NETWORKS:
+    case VIBE_ACT_SELECT_NETWORKS:
         if (s->page != VIBE_WIFI || e->list != s->networks || e->item >= s->snapshot.ap_count) break;
         snprintf(s->selected_ssid, sizeof(s->selected_ssid), "%s", s->snapshot.aps[e->item].ssid);
         TEXT(s, SSID, s->selected_ssid); TEXT(s, PASSWORD_ERROR, "");
@@ -205,15 +203,12 @@ static void event(esp_gsp_handle_t ui, const esp_gsp_event_t *e, void *ctx)
         s->password_visible = false;
         clear_secret(s->password_projection, sizeof(s->password_projection));
         show(s, VIBE_PASSWORD);
-        (void)esp_gsp_component_set_visible(ui, GSP_VIBE_OBJ_KEY_PASSWORD_KEYBOARD_LOWER, true);
-        (void)esp_gsp_component_set_visible(ui, GSP_VIBE_OBJ_KEY_PASSWORD_KEYBOARD_UPPER, false);
-        (void)esp_gsp_component_set_visible(ui, GSP_VIBE_OBJ_KEY_PASSWORD_KEYBOARD_SYM, false);
+        (void)vv_keyboard_set_mode(ui, VIBE_OBJ_PASSWORD_KEYBOARD, VV_KEYBOARD_LOWER);
         break;
-    case GSP_VIBE_ACT_ID_PASSWORD_KEYBOARD_KEY:
+    case VIBE_ACT_PASSWORD_KEYBOARD_KEY:
         if (s->page != VIBE_PASSWORD) break;
-        /* Native GSP keys emit Unicode codepoints, Backspace=8, Enter=13.
-         * Own the bounded buffer so masking works identically with 1.2.0's
-         * device runtime and sim_bridge (which lacks keyboard read-back). */
+        /* Keys emit ASCII codes, Backspace=8, Enter=13. The controller owns
+         * the bounded buffer so masking and the 64-byte limit stay here. */
         if (e->arg == 13) submit_password(s);
         else {
             size_t len = strlen(s->password);
@@ -224,24 +219,24 @@ static void event(esp_gsp_handle_t ui, const esp_gsp_event_t *e, void *ctx)
             project_password(s);
         }
         break;
-    case GSP_VIBE_ACT_ID_TOGGLE_PASSWORD:
+    case VIBE_ACT_TOGGLE_PASSWORD:
         if (s->page == VIBE_PASSWORD) { s->password_visible = !s->password_visible; TEXT(s, PASSWORD_TOGGLE, s->password_visible ? "Hide" : "Show"); project_password(s); }
         break;
-    case GSP_VIBE_ACT_ID_SELECT_BUNDLES:
+    case VIBE_ACT_SELECT_BUNDLES:
         if (s->page != VIBE_NAND || e->list != s->bundles || e->item >= s->snapshot.bundle_count) break;
         s->selected_bundle = s->snapshot.bundles[e->item];
         TEXT(s, RELEASE, s->selected_bundle.release);
         FORMAT(s, RELEASE_DETAIL, "%u components - %lu KB", s->selected_bundle.components, (unsigned long)(s->selected_bundle.bytes / 1024));
         TEXT(s, RELEASE_PATH, s->selected_bundle.path);
         show(s, VIBE_CONFIRM); break;
-    case GSP_VIBE_ACT_ID_INSTALL:
+    case VIBE_ACT_INSTALL:
         if (s->page != VIBE_CONFIRM) break;
         err = command(s, VIBE_INSTALL_NAND, s->selected_bundle.path, NULL);
         if (err) error_result(s, "NAND update failed", err);
         else {
             TEXT(s, UPDATE_TITLE, "Updating system"); TEXT(s, UPDATE_DETAIL, "Opening NAND firmware bundle");
             TEXT(s, UPDATE_PERCENT, "0%"); TEXT(s, UPDATE_OWNER, "NAND"); TEXT(s, UPDATE_VERIFIED, "Validating");
-            (void)esp_gsp_set_value(ui, GSP_VIBE_BIND_PROGRESS, 0);
+            (void)vv_set_value(ui, VIBE_BIND_PROGRESS, 0);
             show(s, VIBE_UPDATE);
         }
         break;
@@ -263,12 +258,12 @@ void vibe_ui_poll(vibe_ui_t *s)
     if (v->ap_count > VIBE_AP_MAX) v->ap_count = VIBE_AP_MAX;
     if (v->bundle_count > VIBE_BUNDLE_MAX) v->bundle_count = VIBE_BUNDLE_MAX;
     if (scan != v->scan_generation || ap_count != v->ap_count) {
-        (void)esp_gsp_list_set_total(s->ui, s->networks, v->ap_count);
-        (void)esp_gsp_list_refresh(s->ui, s->networks);
+        (void)vv_list_set_total(s->ui, s->networks, v->ap_count);
+        (void)vv_list_refresh(s->ui, s->networks);
     }
     if (nand != v->nand_generation || bundle_count != v->bundle_count) {
-        (void)esp_gsp_list_set_total(s->ui, s->bundles, v->bundle_count);
-        (void)esp_gsp_list_refresh(s->ui, s->bundles);
+        (void)vv_list_set_total(s->ui, s->bundles, v->bundle_count);
+        (void)vv_list_refresh(s->ui, s->bundles);
     }
     if (v->updating) {
         if (s->page != VIBE_UPDATE) show(s, VIBE_UPDATE);
@@ -327,33 +322,33 @@ void vibe_ui_poll(vibe_ui_t *s)
     default: break;
     }
 }
-static void tick(esp_gsp_handle_t ui, void *ctx)
+static void tick(vv_view_t *ui, void *ctx)
 {
     (void)ui;
     vibe_ui_t *s = ctx;
     if (s->page == VIBE_PASSWORD) project_password(s);
     if (++s->tick % 5 == 0) vibe_ui_poll(s);
 }
-esp_gsp_err_t vibe_ui_init(vibe_ui_t *s, esp_gsp_handle_t ui, const vibe_services_t *services)
+vv_err_t vibe_ui_init(vibe_ui_t *s, vv_view_t *ui, const vibe_services_t *services)
 {
-    if (!s || !ui || !services || !services->snapshot || !services->command) return ESP_GSP_ERR_INVALID_ARG;
+    if (!s || !ui || !services || !services->snapshot || !services->command) return VV_ERR_INVALID_ARG;
     memset(s, 0, sizeof(*s)); s->ui = ui; s->services = *services;
-    s->networks = esp_gsp_list_bind_component(ui, GSP_VIBE_OBJ_KEY_NETWORKS, network_row, s);
-    s->bundles = esp_gsp_list_bind_component(ui, GSP_VIBE_OBJ_KEY_BUNDLES, bundle_row, s);
-    if (s->networks == ESP_GSP_LIST_NONE || s->bundles == ESP_GSP_LIST_NONE) return ESP_GSP_ERR_NO_MEM;
-    esp_gsp_err_t err = esp_gsp_on_event(ui, event, s);
-    if (err != ESP_GSP_OK) return err;
+    s->networks = vv_list_bind(ui, VIBE_OBJ_NETWORKS, network_row, s);
+    s->bundles = vv_list_bind(ui, VIBE_OBJ_BUNDLES, bundle_row, s);
+    if (s->networks == VV_LIST_NONE || s->bundles == VV_LIST_NONE) return VV_ERR_NO_MEM;
+    vv_err_t err = vv_on_event(ui, event, s);
+    if (err != VV_OK) return err;
     show(s, VIBE_HOME); vibe_ui_poll(s);
-    s->timer = esp_gsp_timer_create(ui, 50, tick, s);
-    return s->timer ? ESP_GSP_OK : ESP_GSP_ERR_NO_MEM;
+    s->timer = vv_timer_create(ui, 50, tick, s);
+    return s->timer ? VV_OK : VV_ERR_NO_MEM;
 }
 void vibe_ui_deinit(vibe_ui_t *s)
 {
     if (!s || !s->ui) return;
     show(s, VIBE_HOME);
     (void)command(s, VIBE_STOP_BRIDGE, NULL, NULL);
-    if (s->timer) (void)esp_gsp_timer_delete(s->ui, s->timer);
-    (void)esp_gsp_on_event(s->ui, NULL, NULL);
+    if (s->timer) (void)vv_timer_delete(s->ui, s->timer);
+    (void)vv_on_event(s->ui, NULL, NULL);
     clear_secret(s->snapshot.token, sizeof(s->snapshot.token));
     s->ui = NULL; s->timer = NULL;
 }

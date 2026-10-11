@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "esp_gsp.h"
+#include "vibe_view.h"
 #include "vibe_transfer.h"
 
 #define VIBE_AP_MAX 16
@@ -52,11 +52,11 @@ typedef struct {
     int (*command)(void *ctx, vibe_command_t command, const char *first, const char *second);
 } vibe_services_t;
 typedef struct {
-    esp_gsp_handle_t ui;
+    vv_view_t *ui;
     vibe_services_t services;
     vibe_snapshot_t snapshot;
     vibe_page_t page;
-    esp_gsp_list_t networks, bundles;
+    vv_list_t networks, bundles;
     void *timer;
     bool download_pending, password_visible;
     bool prefetch_attempted;
@@ -67,8 +67,8 @@ typedef struct {
     unsigned tick;
 } vibe_ui_t;
 
-esp_gsp_err_t vibe_ui_init(vibe_ui_t *state, esp_gsp_handle_t ui, const vibe_services_t *services);
+vv_err_t vibe_ui_init(vibe_ui_t *state, vv_view_t *ui, const vibe_services_t *services);
 void vibe_ui_deinit(vibe_ui_t *state);
-/* Call only on the render task, like event and timer callbacks. */
+/* Call only on the UI task, like event and timer callbacks. */
 int vibe_ui_open_bridge(vibe_ui_t *state);
 void vibe_ui_poll(vibe_ui_t *state);
