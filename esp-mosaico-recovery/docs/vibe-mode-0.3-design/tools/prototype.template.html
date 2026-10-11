@@ -157,6 +157,7 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
           <button type="button" id="simWifi" aria-pressed="true">Wi‑Fi 已连接</button>
           <button type="button" id="simGuide">首次进入（显示引导）</button>
           <button type="button" id="simReset">重置原型</button>
+          <button type="button" id="simPhysical" aria-pressed="false">近似实物尺寸</button>
         </div>
         <div class="status-line" id="simStatus"></div>
       </div>
@@ -214,9 +215,9 @@ const NETWORKS = [
   { ssid: "Cafe Corner", secured: true, signal: "Weak" },
 ];
 const ENTRY = {
-  password: { limit: 64, placeholder: "Type the Wi-Fi password", note: " " },
-  city: { limit: 40, placeholder: "Type your city", note: "Apps use it for weather and local info." },
-  token: { limit: 128, placeholder: "Type your token", note: "Every app on this device can read it." },
+  password: { limit: 64, placeholder: "Type the password", note: "Or set it from your computer." },
+  city_input: { limit: 40, placeholder: "Type your city", note: "Letters and spaces, up to 40." },
+  token_input: { limit: 128, placeholder: "Type your token", note: "Every app can read it." },
 };
 function freshModel() {
   return {
@@ -231,7 +232,7 @@ function freshModel() {
     city: "Shanghai",
     token: P.ai_token,
     guideDone: true,
-    dl: { digits: "", status: "Enter the app ID", error: "" },
+    dl: { digits: "", looking: false },
     detail: null,               // { mode, app }
     deleteArmed: false,
     progress: null,
@@ -265,7 +266,7 @@ function textNode(o, text, align, offset) {
   s.style.lineHeight = px(LH[o.font] * o.size);
   s.style.color = o.color;
   s.style.textAlign = align;
-  if (offset) s.style.transform = `translateX(${offset}px)`;
+  if (offset || o.text_dy) s.style.transform = `translate(${offset || 0}px, ${o.text_dy || 0}px)`;
   if (o.wrap) {
     s.style.whiteSpace = "normal"; s.style.display = "-webkit-box"; s.style.webkitBoxOrient = "vertical";
     s.style.webkitLineClamp = String(Math.max(1, Math.floor(o.h / (LH[o.font] * o.size)))); s.style.overflow = "hidden";
@@ -354,8 +355,8 @@ function renderKeyboard(n, kb, onAction) {
     [...chars].forEach((ch, i) => key(start + i * (kw + gap), 4 + r * pitch, kw, ch, kb.key_color, `kb:${ch}`));
   });
   const y3 = 4 + 2 * pitch, y4 = 4 + 3 * pitch;
-  key(8, y3, 56, "shift", kbMode === "upper" ? "#3a3a3a" : kb.function_color, "kb:shift", { icon: iconPath("back", 22, "white"), rotate: 90, aria: "Shift" });
-  key(416, y3, 56, "delete", kb.function_color, "kb:del", { icon: iconPath("backspace", 26, "white"), aria: "Delete" });
+  key(8, y3, 56, "shift", kbMode === "upper" ? "#3a3a3a" : kb.function_color, "kb:shift", { icon: iconPath("back", 28, "white"), rotate: 90, aria: "Shift" });
+  key(416, y3, 56, "delete", kb.function_color, "kb:del", { icon: iconPath("backspace", 28, "white"), aria: "Delete" });
   key(8, y4, 88, kbMode === "sym" ? "ABC" : "123", kb.function_color, "kb:sym", { size: kb.function_font_size });
   key(104, y4, 272, "space", kb.key_color, "kb: ", { size: kb.function_font_size });
   key(384, y4, 88, "GO", kb.ok_color, "kb:go", { size: kb.function_font_size, color: kb.ok_text_color });
@@ -379,7 +380,7 @@ function renderList(root, vp, kind, items, onAction) {
     if (onAction) {
       const hit = document.createElement("button");
       hit.type = "button"; hit.className = "row-hit";
-      hit.style.left = "0"; hit.style.top = px(y); hit.style.width = px(vp.w); hit.style.height = px(60);
+      hit.style.left = "0"; hit.style.top = px(y); hit.style.width = px(vp.w); hit.style.height = px(88);
       hit.setAttribute("aria-label", values[kind === "apps" ? "apps_name" : "networks_title"]);
       hit.addEventListener("click", () => onAction(`row:${kind}:${i}`));
       content.appendChild(hit);
@@ -429,25 +430,26 @@ const appById = (id) => model.apps.find((a) => a.id === id);
 const sizeMB = (a) => parseFloat(a.size) || 0;
 
 function statusIcons(objs) {
-  setImage(objs, "status_wifi", model.wifi.connected ? iconPath("wifi", 22, "white") : iconPath("wifi_off", 22, "grey"));
-  setImage(objs, "status_agent", iconPath("robot", 22, model.agent ? "orange" : "grey"));
-  setImage(objs, "status_battery", iconPath("battery_mid", 22, "white"));
+  setImage(objs, "status_wifi", model.wifi.connected ? iconPath("wifi", 28, "white") : iconPath("wifi_off", 28, "grey"));
+  setImage(objs, "status_agent", iconPath("robot", 28, model.agent ? "orange" : "grey"));
+  setImage(objs, "status_battery", iconPath("battery_mid", 28, "white"));
 }
+
+function rowDetail(a) { return a.official ? `${catLabel(a.category)} · ${a.id}` : `Community app · ${a.id}`; }
+function facts(a) { return `${catLabel(a.category)} · ${a.official ? "Official" : "Community"} · v${a.version} · ${a.size}`; }
 
 function homeView() {
   const flt = model.filter;
   const apps = filteredApps();
   const kind = flt === "all" ? "" : flt === "favorites" ? "-favorites" : "-category";
-  const objs = tpl(apps.length ? `home${kind}` : `home${kind || ""}-empty`);
+  const objs = tpl(apps.length ? `home${kind}` : `home${kind}-empty`);
   statusIcons(objs);
-  setText(objs, "home_title", P.filter_titles[flt]);
-  setText(objs, "app_count", String(apps.length).padStart(2, "0"));
-  if (CAT_LABEL[flt]) setText(objs, "chip_category_on", CAT_LABEL[flt]);
-  const rows = apps.map((a) => ({
-    apps_initial: initial(a.name), apps_star: model.favorites.has(a.id) ? "★" : " ", apps_name: a.name,
-    apps_detail: `${catLabel(a.category)} · ${a.id}`, apps_badge_current: model.current === a.id ? "● CURRENT" : " ",
-    apps_badge_source: a.official ? " " : "COMMUNITY",
-  }));
+  setText(objs, "home_title", P.filter_labels[flt] || catLabel(flt));
+  const rows = apps.map((a) => {
+    const current = model.current === a.id;
+    return { apps_initial: initial(a.name), apps_star: model.favorites.has(a.id) ? "★" : " ", apps_name: a.name,
+             apps_detail: current ? " " : rowDetail(a), apps_detail_current: current ? "● Current app" : " " };
+  });
   return { objs, lists: { apps: rows } };
 }
 
@@ -457,11 +459,11 @@ function quickSwitchObjs() {
   const overlay = objs.slice(start).filter((o) => o.name !== "ai_cue");
   const apps = filteredApps();
   const app = apps[model.qs.index];
-  setText(overlay, "switch_filter", `QUICK SWITCH · ${P.filter_titles[model.filter]}`);
+  setText(overlay, "switch_filter", (P.filter_labels[model.filter] || "").toUpperCase());
   setText(overlay, "switch_position", `${model.qs.index + 1}/${apps.length}`);
   setText(overlay, "switch_initial", initial(app.name));
   setText(overlay, "switch_name", app.name);
-  setText(overlay, "switch_detail", `${catLabel(app.category)} · ${app.id}${model.current === app.id ? " · current" : ""}`);
+  setText(overlay, "switch_detail", model.current === app.id ? "● Current app" : rowDetail(app));
   const hold = named(overlay, "switch_hold"); if (hold) hold.value = 0;
   return overlay;
 }
@@ -478,25 +480,21 @@ function categoriesView() {
 
 function downloadView() {
   const objs = tpl("download");
-  const d = model.dl.digits;
-  setText(objs, "id_digits", d.length <= 8 ? d + "·".repeat(Math.max(0, 6 - d.length)) : " ");
-  setText(objs, "id_digits_compact", d.length > 8 ? d : " ");
-  setText(objs, "id_status", model.dl.error ? " " : model.dl.status);
-  setText(objs, "id_error", model.dl.error || " ");
+  const d = model.dl.digits, looking = model.dl.looking;
+  setText(objs, "id_digits", !looking && d && d.length <= 8 ? d : " ");
+  setText(objs, "id_digits_compact", !looking && d.length > 8 ? d : " ");
+  setText(objs, "id_status", looking ? "Looking up…" : d ? " " : "Type the app ID");
   return { objs };
-}
-
-function pairedStatus(objs, name, on, onText, offText) {
-  const o = named(objs, `${name}_on`) || named(objs, `${name}_off`);
-  if (!o) return;
-  o.text = on ? onText : offText; o.color = on ? C.accent : C.text_secondary; o.name = `${name}_${on ? "on" : "off"}`;
 }
 
 function developView() {
   const objs = tpl("develop");
-  pairedStatus(objs, "develop_usb", model.usb, "Plugged in", "Not plugged in");
-  pairedStatus(objs, "develop_link", model.agent, "Connected", "Waiting");
-  setText(objs, "develop_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
+  const st = objs.find((o) => o.name && o.name.startsWith("develop_status"));
+  const on = model.usb && model.agent;
+  if (st) {
+    st.text = `● ${model.usb ? (model.agent ? "USB connected · AI agent ready" : "USB connected · waiting for agent") : "Plug in a USB data cable"}`;
+    st.color = on ? C.accent : C.text_secondary; st.name = on ? "develop_status_on" : "develop_status_off";
+  }
   return { objs };
 }
 
@@ -514,21 +512,28 @@ function detailView() {
   setText(objs, "detail_initial", initial(app.name));
   setText(objs, "detail_name", app.name);
   setText(objs, "detail_id", app.id);
-  setText(objs, "detail_meta", `v${app.version} · ${app.size}`);
-  setImage(objs, "button_qr_app_code", `assets/qr/app-${app.id}.png`);
-  setText(objs, "detail_summary", app.summary || "");
-  setText(objs, "detail_facts", `${catLabel(app.category)} · ${app.official ? "Official" : "Community"}`);
+  setText(objs, "detail_facts", facts(app));
   const local = appById(app.id);
   const status = mode === "current" ? "● Current app" : mode === "local" ? "Saved · not running" :
-    mode === "remote_update" ? `Update · v${local.version} → v${app.version}` : "Not on this device";
+    mode === "remote_update" ? `Update v${local.version} → v${app.version}` : "Not on this device";
   setText(objs, "detail_status", status);
   setText(objs, "detail_status_accent", status);
   const fav = objs.find((o) => o.name && o.name.startsWith("button_favorite"));
   if (fav) {
     const on = model.favorites.has(app.id);
-    fav.icon.image = on ? iconPath("star_fill", 22, "orange") : iconPath("star", 22, "white");
+    fav.icon.image = on ? iconPath("star_fill", 32, "orange") : iconPath("star", 32, "white");
     fav.name = on ? "button_favorite_on" : "button_favorite_off";
   }
+  return { objs };
+}
+
+function aboutView() {
+  const app = model.detail.app;
+  const objs = tpl("about");
+  setText(objs, "about_name", app.name);
+  setImage(objs, "button_qr_app_code", `assets/qr/app-${app.id}.png`);
+  setText(objs, "about_summary", app.summary || "");
+  setText(objs, "about_facts", facts(app));
   return { objs };
 }
 
@@ -548,8 +553,7 @@ function progressView() {
   setText(objs, "progress_detail", p.detail);
   setText(objs, "progress_percent", `${Math.floor(p.pct)}%`);
   const bar = named(objs, "progress"); if (bar) bar.value = p.pct;
-  setText(objs, "progress_bytes", `${(p.total * p.pct / 100).toFixed(2)} MB of ${p.total.toFixed(2)} MB`);
-  setText(objs, "progress_rate", p.pct >= 100 ? "--" : p.rate);
+  setText(objs, "progress_bytes", `${(p.total * p.pct / 100).toFixed(2)} of ${p.total.toFixed(2)} MB · ${p.pct >= 100 ? "--" : p.rate}`);
   setText(objs, "progress_step", p.step);
   return { objs };
 }
@@ -568,7 +572,7 @@ function wifiView() {
   let objs = tpl(model.pendingLookup ? "wifi-pending" : "wifi");
   const w = model.wifi;
   setText(objs, "wifi_connection", w.connected ? w.ssid : w.connecting ? w.connecting : "Not connected");
-  setText(objs, "wifi_detail", w.connected ? `Connected · ${w.ip}` : w.connecting ? "Connecting…" : "Choose a network below");
+  setText(objs, "wifi_detail", w.connected ? "Connected" : w.connecting ? "Connecting…" : "Choose a network");
   if (!w.connected) objs = without(objs, ["button_forget"]);
   setText(objs, "wifi_scan", model.scanning ? "SCANNING…" : `NETWORKS · ${NETWORKS.length}`);
   const rows = model.scanning ? [] : NETWORKS.map((n) => ({
@@ -577,28 +581,36 @@ function wifiView() {
 }
 
 function entryView(page) {
-  const objs = tpl(page);
+  const objs = tpl(page.replace("_", "-"));
   const e = model.entry, spec = ENTRY[page];
-  if (page === "password") setText(objs, "password_subtitle", model.password.ssid);
   let shown = e.text;
-  if (e.text && page !== "city" && !e.visible) {
-    shown = page === "token" && e.text.length > 8 ? "•".repeat(12) + e.text.slice(-4) : "•".repeat(e.text.length);
+  if (e.text && page !== "city_input" && !e.visible) {
+    shown = page === "token_input" && e.text.length > 8 ? "•".repeat(8) + e.text.slice(-4) : "•".repeat(e.text.length);
   }
-  const disp = setText(objs, `${page}_display`, e.text ? (shown.length > 22 ? shown.slice(-22) : shown) : spec.placeholder);
+  const disp = setText(objs, `${page}_display`, e.text ? (shown.length > 18 ? "…" + shown.slice(-17) : shown) : spec.placeholder);
   if (disp) disp.color = e.text ? C.text : C.text_tertiary;
-  setImage(objs, `button_toggle_${page}`, iconPath(e.visible ? "eye_off" : "eye", 24, "white"));
+  setImage(objs, `button_toggle_${page}`, iconPath(e.visible ? "eye_off" : "eye", 32, "white"));
   const note = setText(objs, `${page}_note`, e.error || spec.note);
-  if (note && e.error) note.color = C.accent;
+  if (note) note.color = e.error || page === "token_input" ? C.accent : C.text_secondary;
   return { objs };
 }
+
+const tokenText = () => model.token ? `Set · ends in ${model.token.slice(-4)}` : "Not set";
 
 function deviceView() {
   const objs = tpl("device");
   setText(objs, "device_wifi", model.wifi.connected ? model.wifi.ssid : "Not connected");
   setText(objs, "device_city", model.city || "Not set");
-  setText(objs, "device_token", model.token ? `Set · ends in ${model.token.slice(-4)}` : "Not set");
+  setText(objs, "device_token", tokenText());
+  setText(objs, "device_summary", `Vibe Mode 0.3.0 · ${model.apps.length} apps`);
+  return { objs };
+}
+
+function deviceInfoView() {
+  const objs = tpl("device-info");
   const used = model.apps.reduce((sum, a) => sum + sizeMB(a), 0);
   setText(objs, "device_storage", `${model.apps.length} apps · ${used.toFixed(1)} MB used`);
+  setText(objs, "device_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
   return { objs };
 }
 
@@ -606,9 +618,11 @@ function simpleView(id, edit) { const objs = tpl(id); if (edit) edit(objs); retu
 
 const VIEWS = {
   home: homeView, categories: categoriesView, download: downloadView, develop: developView, wifi_link: wifiLinkView,
-  detail: detailView, qr: qrView, progress: progressView, result: resultView, wifi: wifiView,
-  password: () => entryView("password"), city: () => entryView("city"), token: () => entryView("token"),
-  device: deviceView,
+  detail: detailView, about: aboutView, qr: qrView, progress: progressView, result: resultView, wifi: wifiView,
+  password: () => entryView("password"), city_input: () => entryView("city_input"), token_input: () => entryView("token_input"),
+  city: () => simpleView("city", (o) => setText(o, "city_value", model.city || "Not set")),
+  token: () => simpleView("token", (o) => setText(o, "token_value", tokenText())),
+  device: deviceView, device_info: deviceInfoView,
   help: () => simpleView("help"),
   topic: (p) => simpleView(`help-topic-${p.key}`),
   guide: (p) => simpleView(`guide-${p.step}`),
@@ -727,21 +741,21 @@ function download(app, thenRun) {
     if (existing) Object.assign(existing, clone(app)); else model.apps.push(clone(app));
     if (thenRun) install(app, "store");
     else showResult({ kind: "saved", title: "Saved to My Apps", caption: `${app.name} · v${app.version}`,
-                      detail: "Open it any time from My Apps.", second: "Open now", app });
+                      detail: "Open it any time\nfrom the list.", second: "Open now", app });
   });
 }
 function lookup() {
   const id = model.dl.digits;
-  if (!id) { model.dl.error = "Type an app ID first"; render(0); return; }
+  if (!id) return toast("Type an app ID first");
   if (!model.wifi.connected) { model.pendingLookup = true; go("wifi"); return; }
-  model.dl.error = ""; model.dl.status = "Looking up…"; render(0);
+  model.dl.looking = true; render(0);
   setTimeout(() => {
     if (cur().view !== "download") return;
-    model.dl.status = "Enter the app ID";
-    if (id === "500500") { model.dl.error = "Store is busy. Try again soon."; render(0); return; }
-    if (id === "666666") { model.dl.error = "Not available for this device"; render(0); return; }
+    model.dl.looking = false;
+    if (id === "500500") return toast("Store is busy. Try later.");
+    if (id === "666666") return toast("Not for this device");
     const found = STORE[id];
-    if (!found) { model.dl.error = "No app with this ID"; render(0); return; }
+    if (!found) return toast("No app with this ID");
     const app = clone(found);
     const local = appById(id);
     if (local && local.version === app.version) {
@@ -785,7 +799,7 @@ function submitEntry(page) {
     return connect(model.password.ssid);
   }
   const value = e.text.trim();
-  if (page === "city") {
+  if (page === "city_input") {
     if (!value) { e.error = "Type a city name first"; return render(0); }
     model.city = value; back(); return toast("City saved");
   }
@@ -798,9 +812,9 @@ function onAction(action) {
   const [kind, arg, extra] = action.split(":");
   if (kind === "go") {
     if (arg === "home") return home();
-    if (arg === "download") model.dl = { digits: "", status: "Enter the app ID", error: "" };
-    if (arg === "city") { model.entry = { text: model.city || "", visible: true, error: "" }; kbMode = "lower"; }
-    if (arg === "token") { model.entry = { text: model.token || "", visible: false, error: "" }; kbMode = "lower"; }
+    if (arg === "download") model.dl = { digits: "", looking: false };
+    if (arg === "city_input") { model.entry = { text: model.city || "", visible: true, error: "" }; kbMode = "lower"; }
+    if (arg === "token_input") { model.entry = { text: model.token || "", visible: false, error: "" }; kbMode = "lower"; }
     return go(arg);
   }
   if (action === "back") return back();
@@ -821,10 +835,10 @@ function onAction(action) {
   }
   if (kind === "key") {
     const d = model.dl;
-    if (arg === "del") { d.digits = d.digits.slice(0, -1); d.error = ""; }
+    if (d.looking) return;
+    if (arg === "del") d.digits = d.digits.slice(0, -1);
     else if (arg === "go") return lookup();
-    else if (d.digits.length < 16) { d.digits += arg; d.error = ""; }
-    d.status = d.digits.length ? "Tap → to look it up" : "Enter the app ID";
+    else if (d.digits.length < 16) d.digits += arg;
     return render(0);
   }
   if (kind === "row" && arg === "apps") {
@@ -850,7 +864,7 @@ function onAction(action) {
     if (arg === "run") return runApp(app);
     if (arg === "update") {
       const latest = STORE[app.id];
-      if (!model.wifi.connected) { go("wifi"); return toast("Connect Wi-Fi to check for updates"); }
+      if (!model.wifi.connected) { go("wifi"); return toast("Connect Wi-Fi first"); }
       if (latest && latest.version !== app.version) {
         model.detail = { mode: "remote_update", app: clone(latest) };
         return replace("detail");
@@ -884,6 +898,7 @@ function onAction(action) {
     if (arg === "forget") { model.wifi = { connected: false, ssid: "", ip: "" }; syncSim(); return render(0); }
     if (arg === "scan") { model.scanning = true; render(0); setTimeout(() => { model.scanning = false; if (cur().view === "wifi") render(0); }, 1200); return; }
   }
+  if (kind === "token" && arg === "clear") { model.token = ""; render(0); return toast("AI token cleared"); }
   if (ENTRY[kind] && arg === "toggle") { model.entry.visible = !model.entry.visible; return render(0); }
   if (kind === "kb") {
     const page = cur().view, e = model.entry;
@@ -947,7 +962,7 @@ function gesture(g) {
     if (g === "double") return step < 4 ? replace("guide", { step: step + 1 }) : onAction("guide:done");
     return;
   }
-  if (g === "single") { if (!back()) toast("Double-press AI to switch apps"); return; }
+  if (g === "single") { if (!back()) toast("Press AI twice to switch"); return; }
   if (g === "double") {
     const apps = filteredApps();
     if (!apps.length) return toast("No apps in this list");
@@ -955,7 +970,7 @@ function gesture(g) {
     model.qs = { index: (currentIndex + 1) % apps.length };
     return render(0);
   }
-  if (g === "long") toast("Double-press AI, then hold to open");
+  if (g === "long") toast("Press twice, then hold");
 }
 aiKey.addEventListener("pointerdown", (e) => { e.preventDefault(); aiKey.setPointerCapture(e.pointerId); aiDown(); });
 aiKey.addEventListener("pointerup", aiUp);
@@ -1010,7 +1025,7 @@ for (const [id, text] of TRY_IDS) {
   b.type = "button"; b.textContent = id;
   b.addEventListener("click", () => {
     if (staticMode) exitStatic();
-    model.qs = null; model.dl = { digits: id, status: "Tap → to look it up", error: "" };
+    model.qs = null; model.dl = { digits: id, looking: false };
     stack = [{ view: "home", params: {} }, { view: "download", params: {} }]; render(1);
   });
   const s = document.createElement("span"); s.textContent = text;
@@ -1094,8 +1109,17 @@ document.getElementById("galleryNote").textContent =
 
 /* ---------------- Fit the device to narrow screens ---------------- */
 const fit = document.getElementById("deviceFit"), scaleBox = document.getElementById("deviceScale");
+// Approximate real size: the 2.1-inch screen is 37.7 mm wide. CSS millimetres
+// match physical ones only roughly, depending on the monitor.
+let physical = false;
+const mmProbe = Object.assign(document.createElement("div"), { style: "position:absolute;visibility:hidden;width:37.7mm" });
+document.body.appendChild(mmProbe);
+document.getElementById("simPhysical").addEventListener("click", (e) => {
+  physical = !physical; e.currentTarget.setAttribute("aria-pressed", String(physical)); fitDevice();
+  note(physical ? "屏幕已按 37.7 mm 宽显示（按 CSS 毫米近似，不同显示器会有偏差）。" : "已恢复放大显示。");
+});
 function fitDevice() {
-  const s = Math.min(1, fit.clientWidth / 560);
+  const s = physical ? mmProbe.offsetWidth / 480 : Math.min(1, fit.clientWidth / 560);
   scaleBox.style.transform = `scale(${s})`;
   fit.style.height = `${616 * s}px`;
 }

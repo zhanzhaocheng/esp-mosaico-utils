@@ -58,9 +58,13 @@ FONTS = {
 }
 # Line height per em, from the subset fonts' vertical metrics.
 LINE_EM = {"dot": 1.0, "sans": 1.25, "medium": 1.25}
-# Every size is a separate baked bitmap font in flash, so the design uses a
-# short type scale; the layout check rejects any other size.
-TYPE_SCALE = {"dot": [22, 32, 40, 56, 112], "medium": [12, 15, 17, 20, 24, 28], "sans": [13, 15]}
+# Readability on the real screen: 480 x 480 on a 2.1-inch diagonal is 37.7 mm
+# wide, about 323 ppi, so 1 px = 0.079 mm. Text below 22 px (1.7 mm) and touch
+# targets below 72 px (5.7 mm) are rejected by the layout check, and only the
+# sizes on this scale are allowed.
+PX_MM = 2.1 * 25.4 / math.sqrt(2) / 480  # 0.0786 mm per pixel
+TYPE_SCALE = {"dot": [32, 40, 44, 64, 120], "medium": [22, 28, 34], "sans": [22, 26]}
+MIN_TEXT, MIN_TOUCH, MIN_ICON = 22, 72, 28
 
 TOKENS = {
     "colors": {"background": BG, "card": CARD, "raised": RAISED, "tile": TILE, "outline": LINE,
@@ -71,14 +75,16 @@ TOKENS = {
     "type_scale": TYPE_SCALE,
     "radius": {"card": 20, "row": 16, "key": 18, "chip": 22, "pill": "h/2"},
     "margin": M,
-    "min_touch": 44,
+    "min_touch": MIN_TOUCH,
+    "readability": {"diagonal_inch": 2.1, "px_mm": round(PX_MM, 4), "min_text_px": MIN_TEXT,
+                    "body_text_px": 26, "min_touch_px": MIN_TOUCH, "min_icon_px": MIN_ICON},
     "screen": {"corner_radius": SCREEN_R, "ai_key_center_x": AI_KEY_CX},
     "qr": {"version": 3, "ecc": "L", "quiet_zone_modules": 2, "modules": QR_MODULES,
            "min_module_px": 5, "dark": "#000000", "light": "#FFFFFF"},
     "motion": {"page_slide_px": 48, "page_slide_ms": 160, "easing": "ease_out"},
     "keyboard": {"bg_color": BG, "fg_color": TEXT, "key_color": TILE, "function_color": RAISED,
                  "ok_color": ACCENT, "ok_text_color": WHITE, "key_radius": 10, "font": "medium",
-                 "font_size": 20, "function_font_size": 15},
+                 "font_size": 22, "function_font_size": 22},
     # Product photo: cream body, light grey keys, orange AI key.
     "hardware": {"body": "#E9E2D6", "body_edge": "#C4BBAC", "key": "#CFCAC2", "key_edge": "#A09A92",
                  "ai_key": ACCENT},
@@ -103,7 +109,8 @@ ELLIPSIS = {"apps_name", "apps_detail", "detail_name", "detail_meta", "detail_fa
             "switch_detail", "progress_detail", "result_caption", "wifi_connection", "wifi_detail",
             "networks_title", "device_wifi", "device_city", "password_subtitle", "ai_toast_text",
             "launch_title", "running_title", "qr_full_title", "qr_full_url", "city_display",
-            "home_title", "switch_filter"}
+            "home_title", "switch_filter", "about_name", "about_facts", "apps_detail_current",
+            "city_value", "token_value", "device_summary", "device_token", "progress_bytes"}
 
 
 def label(x, y, w, text, font="sans", size=16, color=TEXT, align="left", h=None, name=None,
@@ -252,40 +259,52 @@ def initial(app) -> str:
 
 
 # --------------------------------------------------------------------------
-# Shared building blocks
+# Shared building blocks (sizes from the 2.1-inch rules in TOKENS["readability"])
 # --------------------------------------------------------------------------
-def circle_button(x, y, icon_name, action, name, size=48, icon_size=22, color="white"):
+BTN = 72      # minimum touch target: 5.7 mm on this 323 ppi screen
+ICON = 32     # icon size inside buttons
+
+
+def circle_button(x, y, icon_name, action, name, size=BTN, icon_size=ICON, color="white"):
     return button(x, y, size, size, bg=BG, border=LINE, bw=2,
                   icon=f"assets/icons/{icon_name}-{icon_size}-{color}.png", action=action, name=name)
 
 
-def header(title, subtitle, back="back", help_topic="topics", page=None, extra=None):
-    """Back button, dot-matrix title and subtitle; ? and an optional extra button on the right."""
+def header(title, back="back", help_topic="topics", page=None, extra=None):
+    """72 px back button, dot-matrix title; ? and an optional extra button on the right."""
     objs = []
     if back:
-        objs.append(circle_button(M, 16, "back", back, f"button_back_{page}"))
+        objs.append(circle_button(M, 14, "back", back, f"button_back_{page}"))
     right = W - M
     if help_topic:
-        objs.append(circle_button(right - 48, 16, "help", f"help:{help_topic}", f"button_help_{page}"))
-        right -= 56
+        objs.append(circle_button(right - BTN, 14, "help", f"help:{help_topic}", f"button_help_{page}"))
+        right -= BTN + 8
     if extra:
-        objs.append(extra(right - 48))
-        right -= 56
-    text_w = right - 80 - (8 if right < W - M else 0)
-    objs.append(label(80, 18, text_w, title, "dot", 32, TEXT, name=f"{page}_title"))
-    objs.append(label(80, 54, text_w, subtitle, "sans", 15, TEXT2, name=f"{page}_subtitle", dynamic=True))
+        objs.append(extra(right - BTN))
+        right -= BTN + 8
+    x0 = M + BTN + 12 if back else M
+    objs.append(label(x0, 30, right - x0 - 8, title, "dot", 40, TEXT, name=f"{page}_title"))
     return objs
 
 
-def primary(x, y, w, text, action, name, icon_name=None, h=56):
-    return button(x, y, w, h, text, "medium", 17, PRIMARY_FG, PRIMARY_BG,
-                  icon=f"assets/icons/{icon_name}-20-black.png" if icon_name else None,
+def primary(x, y, w, text, action, name, icon_name=None, h=80):
+    return button(x, y, w, h, text, "medium", 28, PRIMARY_FG, PRIMARY_BG,
+                  icon=f"assets/icons/{icon_name}-{ICON}-black.png" if icon_name else None,
                   action=action, name=name)
 
 
-def secondary(x, y, w, text, action, name, icon_path=None, h=56, color=TEXT):
-    return button(x, y, w, h, text, "medium", 17, color, BG, border=LINE, bw=2, icon=icon_path,
-                  action=action, name=name)
+def secondary(x, y, w, text, action, name, icon_path=None, h=80, color=TEXT, border=LINE, bg=BG):
+    return button(x, y, w, h, text, "medium", 28, color, bg, border=border, bw=2 if border else 0,
+                  icon=icon_path, action=action, name=name)
+
+
+def stack_button(x, y, w, h, icon_path, text, action, name, color=TEXT, bg=BG, border=LINE):
+    """Icon above a short label: three of these fit one row at 2.1 inches."""
+    obj = button(x, y, w, h, text, "medium", 22, color, bg, border=border, bw=2 if border else 0,
+                 radius=20, action=action, name=name)
+    obj["icon"] = {"image": icon_path, "x": x + (w - ICON) // 2, "y": y + 14, "w": ICON, "h": ICON}
+    obj["text_dy"] = (y + 52 + line_h("medium", 22) / 2) - (y + h / 2)
+    return obj
 
 
 def tile(x, y, size, letter, radius, dot_size, name=None, color=TEXT, bg=TILE):
@@ -295,29 +314,6 @@ def tile(x, y, size, letter, radius, dot_size, name=None, color=TEXT, bg=TILE):
                   color, "center", name=f"{name}_initial" if name else None, dynamic=True)]
 
 
-CHIP_Y, CHIP_H = 114, 44
-
-
-def chip(x, w, text, action, name, on, icon_name=None, icon_left=None):
-    """Filter chip. GSP colours are static, so each chip has an _on and an _off object."""
-    icon_path = None
-    if icon_name:
-        icon_path = f"assets/icons/{icon_name}-18-{'black' if on else 'white'}.png"
-    return button(x, CHIP_Y, w, CHIP_H, text, "medium", 15, PRIMARY_FG if on else TEXT,
-                  PRIMARY_BG if on else BG, border=None if on else LINE, bw=0 if on else 2,
-                  icon=icon_path, action=action, name=f"{name}_{'on' if on else 'off'}", icon_gap=8,
-                  icon_left=icon_left)
-
-
-def chips(flt):
-    in_category = flt not in ("all", "favorites")
-    return [chip(M, 72, "All", "filter:all", "chip_all", flt == "all"),
-            chip(96, 136, "Favorites", "filter:favorites", "chip_favorites", flt == "favorites",
-                 "star_fill" if flt == "favorites" else "star"),
-            chip(240, 176, CATEGORY_LABEL[flt] if in_category else "Categories", "go:categories",
-                 "chip_category", in_category, "grid", icon_left=16)]
-
-
 def qr_code(x, y, name, module, action, button_name):
     """QR image at an integer module size, with a transparent button to enlarge it."""
     size = QR_MODULES * module
@@ -325,24 +321,34 @@ def qr_code(x, y, name, module, action, button_name):
             button(x, y, size, size, bg=None, radius=0, action=action, name=button_name)]
 
 
-def enlarge_hint(x, y, w, text="Tap the code to enlarge"):
-    return [icon(x, y + 1, "expand", 16, "grey"), label(x + 22, y, w - 22, text, "sans", 13, TEXT2)]
+def card_row(y, icon_name, title, value, action=None, name=None, value_name=None, icon_color="grey",
+             h=80, value_color=TEXT2):
+    """Two-line list row: 28 px label over a 22 px value, chevron when it opens something."""
+    objs = []
+    if action:
+        objs.append(button(M, y, 448, h, bg=CARD, radius=20, action=action, name=name))
+    else:
+        objs.append(container(M, y, 448, h, CARD, 20, name=name))
+    objs.append(icon(32, y + (h - ICON) // 2, icon_name, ICON, icon_color))
+    objs.append(label(80, y + 8, 330, title, "medium", 28, TEXT))
+    objs.append(label(80, y + 44, 330, value, "sans", 22, value_color, name=value_name, dynamic=True))
+    if action:
+        objs.append(icon(420, y + (h - 28) // 2, "chevron", 28, "dim"))
+    return objs
 
 
-def status_row(agent=True, wifi_on=True, battery="mid", preset=None):
-    """Home status row: same icon order as the device's own status bar."""
-    objs = [container(M, 29, 10, 10, ACCENT, 5),
-            label(34, 24, 92, "VIBE MODE", "medium", 15, TEXT2)]
+def status_strip(agent=True, wifi_on=True, battery="mid", preset=None):
+    """Home status strip: same icon order as the device's own status bar."""
+    objs = [container(M + 4, 26, 10, 10, ACCENT, 5),
+            label(36, 17, 130, "VIBE MODE", "medium", 22, TEXT2)]
     if preset:
-        objs.append(label(132, 26, 96, f"↓ {preset[0]}/{preset[1]}", "medium", 12, ACCENT,
+        objs.append(label(170, 17, 120, f"↓ {preset[0]}/{preset[1]}", "medium", 22, ACCENT,
                           name="home_preset", dynamic=True))
-    objs.append(icon(258, 23, "wifi" if wifi_on else "wifi_off", 22, "white" if wifi_on else "grey",
+    objs.append(icon(330, 17, "wifi" if wifi_on else "wifi_off", 28, "white" if wifi_on else "grey",
                      "status_wifi"))
-    objs.append(icon(288, 23, "robot", 22, "orange" if agent else "grey", "status_agent"))
-    objs.append(icon(318, 23, f"battery_{battery}", 22, "orange" if battery == "low" else "white",
+    objs.append(icon(368, 17, "robot", 28, "orange" if agent else "grey", "status_agent"))
+    objs.append(icon(406, 17, f"battery_{battery}", 28, "orange" if battery == "low" else "white",
                      "status_battery"))
-    objs.append(circle_button(368, 12, "help", "help:topics", "button_help_home", size=44))
-    objs.append(circle_button(420, 12, "settings", "go:device", "button_device", size=44))
     return objs
 
 
@@ -352,22 +358,18 @@ def ai_cue(active=False):
 
 
 def ai_toast(text):
-    """Transient banner (~1.5 s) that covers the top row after an AI key press or an event."""
-    return [container(M, 14, 448, 48, RAISED, 24, border=LINE, bw=2, name="ai_toast"),
-            label(M, 14 + (48 - line_h("medium", 17)) // 2, 448, text, "medium", 17, TEXT,
+    """Transient banner (~1.5 s) over the top row: AI key hints, events and errors."""
+    return [container(M, 10, 448, 76, RAISED, 38, border=LINE, bw=2, name="ai_toast"),
+            label(M + 16, 10 + (76 - line_h("medium", 28)) // 2, 416, text, "medium", 28, TEXT,
                   "center", name="ai_toast_text", dynamic=True)]
 
 
-def section(y, text):
-    return label(M, y, 300, text, "medium", 12, TEXT2)
-
-
 # --------------------------------------------------------------------------
-# Rows (list templates). Apps: 60 px card + 6 px gap; networks: 60 + 8.
+# Rows (list templates). Apps: 88 px card + 8 px gap; networks: 88 + 8.
 # Row objects carry the list viewport as "clip", exactly like a GSP list.
 # --------------------------------------------------------------------------
-APP_ITEM_H = 66
-NET_ITEM_H = 68
+APP_ITEM_H = 96
+NET_ITEM_H = 96
 
 
 def clipped(objs, viewport, row_of=None):
@@ -379,61 +381,71 @@ def clipped(objs, viewport, row_of=None):
     return objs
 
 
+def row_detail(app):
+    if not app["official"]:
+        return f"Community app · {app['id']}"
+    return f"{CATEGORY_LABEL[app['category']]} · {app['id']}"
+
+
 def app_row(x, y, app, viewport):
-    objs = [container(x, y, 448, 60, CARD, 16, role="row")]
-    objs += tile(x + 9, y + 9, 42, initial(app), 12, 22, name="apps")
+    current = app["id"] == CURRENT
+    objs = [container(x, y, 448, 88, CARD, 20, role="row")]
+    objs += tile(x + 12, y + 12, 64, initial(app), 16, 32, name="apps")
     # Favorite badge on the tile corner; a text glyph so the row setter can blank it.
-    objs.append(label(x + 39, y + 2, 22, "★" if app["id"] in FAV else " ", "medium", 15, ACCENT,
+    objs.append(label(x + 58, y + 1, 30, "★" if app["id"] in FAV else " ", "medium", 22, ACCENT,
                       "center", name="apps_star"))
-    objs.append(label(x + 64, y + 9, 246, app["name"], "medium", 17, TEXT, name="apps_name"))
-    objs.append(label(x + 64, y + 35, 246, f"{CATEGORY_LABEL[app['category']]} · {app['id']}", "sans",
-                      13, TEXT2, name="apps_detail"))
-    objs.append(label(x + 314, y + 11, 96, "● CURRENT" if app["id"] == CURRENT else " ", "medium", 12,
-                      ACCENT, "right", name="apps_badge_current"))
-    # Most apps are official presets, so the list marks the exception.
-    objs.append(label(x + 314, y + 34, 96, " " if app["official"] else "COMMUNITY", "medium", 12,
-                      TEXT2, "right", name="apps_badge_source"))
-    objs.append(icon(x + 418, y + 21, "chevron", 18, "dim"))
+    objs.append(label(x + 92, y + 10, 306, app["name"], "medium", 28, TEXT, name="apps_name"))
+    # Static colours: the current app writes its line into the orange twin.
+    objs.append(label(x + 92, y + 48, 306, " " if current else row_detail(app), "sans", 22, TEXT2,
+                      name="apps_detail"))
+    objs.append(label(x + 92, y + 48, 306, "● Current app" if current else " ", "sans", 22, ACCENT,
+                      name="apps_detail_current"))
+    objs.append(icon(x + 404, y + 30, "chevron", 28, "dim"))
     return clipped(objs, viewport, "apps")
 
 
 def network_row(x, y, ssid, detail, viewport):
-    return clipped([container(x, y, 448, 60, CARD, 16, role="row"),
-                    label(x + 18, y + 9, 360, ssid, "medium", 17, TEXT, name="networks_title"),
-                    label(x + 18, y + 34, 360, detail, "sans", 13, TEXT2, name="networks_detail"),
-                    icon(x + 414, y + 21, "chevron", 18, "dim")], viewport, "networks")
+    return clipped([container(x, y, 448, 88, CARD, 20, role="row"),
+                    label(x + 20, y + 10, 370, ssid, "medium", 28, TEXT, name="networks_title"),
+                    label(x + 20, y + 48, 370, detail, "sans", 22, TEXT2, name="networks_detail"),
+                    icon(x + 404, y + 30, "chevron", 28, "dim")], viewport, "networks")
 
 
 # --------------------------------------------------------------------------
 # Pages
 # --------------------------------------------------------------------------
-LIST_Y, LIST_H = 168, 228
+LIST_Y, LIST_H = 140, 240
+FILTER_LABELS = {"all": "All apps", "favorites": "Favorites", **CATEGORY_LABEL}
 
 
 def home(flt="all", agent=True, apps=None, preset=None, wifi_on=True, battery="mid"):
     apps = LIBRARY if apps is None else apps
     shown = filtered(apps, flt)
-    objs = status_row(agent, wifi_on, battery, preset)
-    objs.append(label(M, 64, 330, FILTER_TITLES[flt], "dot", 40, TEXT, name="home_title", dynamic=True))
-    objs.append(label(348, 64, 116, f"{len(shown):02d}", "dot", 40, ACCENT, "right", name="app_count",
-                      dynamic=True))
-    objs += chips(flt)
+    objs = status_strip(agent, wifi_on, battery, preset)
+    # One list picker instead of three small chips: tap to choose All, Favorites or a category.
+    objs.append(button(M, 56, 288, BTN, bg=BG, border=LINE, bw=2, radius=36, action="go:categories",
+                       name="button_filter"))
+    objs.append(label(40, 56 + (BTN - 35) // 2, 218, FILTER_LABELS[flt], "medium", 28, TEXT,
+                      name="home_title", dynamic=True))
+    objs.append(icon(262, 56 + (BTN - 28) // 2, "chevron_down", 28, "white"))
+    objs.append(circle_button(312, 56, "help", "help:topics", "button_help_home"))
+    objs.append(circle_button(392, 56, "settings", "go:device", "button_device"))
     if shown:
         viewport = (M, LIST_Y, 448, LIST_H)
         objs.append({"type": "list_viewport", "x": M, "y": LIST_Y, "w": 448, "h": LIST_H, "name": "apps",
-                     "item_height": APP_ITEM_H, "row_template": "apps_row"})
-        for i, app in enumerate(shown[:4]):
+                     "item_height": APP_ITEM_H, "row_template": "apps_row", "count": len(shown)})
+        for i, app in enumerate(shown[:3]):
             objs += app_row(M, LIST_Y + i * APP_ITEM_H, app, viewport)
     else:
         title, body = EMPTY_COPY[flt if flt in EMPTY_COPY else "category"]
-        objs.append(image(212, 192, "assets/icons/empty-56-grey.png", name="home_empty_icon"))
-        objs.append(label(M, 262, 448, title, "medium", 20, TEXT, "center", name="home_empty_title",
+        objs.append(image(212, 160, "assets/icons/empty-56-grey.png", name="home_empty_icon"))
+        objs.append(label(M, 232, 448, title, "medium", 28, TEXT, "center", name="home_empty_title",
                           dynamic=True))
-        objs.append(label(40, 294, 400, body, "sans", 15, TEXT2, "center", name="home_empty_body",
+        objs.append(label(M, 276, 448, body, "sans", 22, TEXT2, "center", name="home_empty_body",
                           dynamic=True))
-    objs.append(primary(M, 404, 216, "Download app", "go:download", "button_download", "download"))
-    objs.append(secondary(248, 404, 216, "Develop app", "go:develop", "button_develop",
-                          "assets/icons/code-20-white.png"))
+    objs.append(primary(M, 388, 216, "Download", "go:download", "button_download", "download"))
+    objs.append(secondary(248, 388, 216, "Develop", "go:develop", "button_develop",
+                          f"assets/icons/code-{ICON}-white.png"))
     objs.append(ai_cue())
     return objs
 
@@ -442,23 +454,23 @@ def quick_switch(index=1, flt="all"):
     objs = [o for o in home(flt) if o.get("name") != "ai_cue"]
     apps = filtered(LIBRARY, flt)
     app = apps[index]
-    objs.append(container(0, 0, W, H, BG, 0, opacity=232, role="scrim"))
-    objs.append(container(40, 60, 400, 360, CARD, 28, border=LINE, bw=2, name="switch_card"))
-    objs.append(label(64, 83, 228, f"QUICK SWITCH · {FILTER_TITLES[flt]}", "medium", 12, TEXT2,
+    objs.append(container(0, 0, W, H, BG, 0, opacity=235, role="scrim"))
+    objs.append(container(24, 40, 432, 400, CARD, 32, border=LINE, bw=2, name="switch_card"))
+    objs.append(label(48, 60, 260, FILTER_LABELS[flt].upper(), "medium", 22, TEXT2,
                       name="switch_filter", dynamic=True))
-    objs.append(label(296, 78, 120, f"{index + 1}/{len(apps)}", "dot", 22, TEXT2, "right",
+    objs.append(label(312, 56, 120, f"{index + 1}/{len(apps)}", "dot", 32, TEXT2, "right",
                       name="switch_position", dynamic=True))
-    objs += tile(180, 114, 120, initial(app), 34, 56, name="switch")
-    objs.append(label(56, 250, 368, app["name"], "medium", 24, TEXT, "center", name="switch_name",
+    objs += tile(180, 104, 120, initial(app), 34, 64, name="switch")
+    objs.append(label(40, 238, 400, app["name"], "medium", 34, TEXT, "center", name="switch_name",
                       dynamic=True))
-    objs.append(label(56, 284, 368, f"{CATEGORY_LABEL[app['category']]} · {app['id']}", "sans", 15, TEXT2,
-                      "center", name="switch_detail", dynamic=True))
-    objs.append(progress(64, 322, 352, 4, 35, name="switch_hold"))
-    objs.append(container(64, 346, 352, 1, DIVIDER))
+    objs.append(label(40, 286, 400, row_detail(app), "sans", 22, TEXT2, "center", name="switch_detail",
+                      dynamic=True))
+    objs.append(progress(48, 330, 384, 6, 35, name="switch_hold"))
+    objs.append(container(48, 350, 384, 1, DIVIDER))
     for i, (key, text) in enumerate((("AI ×2", "Next"), ("Hold AI", "Open"), ("AI", "Close"))):
-        x = 64 + i * 120
-        objs.append(label(x, 362, 112, key, "medium", 12, TEXT, "center"))
-        objs.append(label(x, 382, 112, text, "sans", 13, TEXT2, "center"))
+        x = 48 + i * 128
+        objs.append(label(x, 362, 128, key, "medium", 22, TEXT, "center"))
+        objs.append(label(x, 392, 128, text, "sans", 22, TEXT2, "center"))
     objs.append(ai_cue(True))
     return objs
 
@@ -471,256 +483,225 @@ def category_tiles():
 
 
 def categories(selected="all"):
-    objs = header("CATEGORIES", "Find apps by type", page="categories", help_topic="start")
+    objs = header("SHOW", page="categories", help_topic="start")
     for i, (key, text, ic, n) in enumerate(category_tiles()):
-        x, y = M + (i % 2) * 232, 88 + (i // 2) * 88
-        objs.append(button(x, y, 216, 80, bg=CARD, radius=20, action=f"filter:{key}", name=f"category_{key}"))
-        objs.append(icon(x + 16, y + 16, ic, 22, "white"))
-        objs.append(label(x + 112, y + 15, 88, f"{n:02d}", "dot", 22, TEXT2, "right",
+        x, y = M + (i % 2) * 232, 96 + (i // 2) * 92
+        objs.append(button(x, y, 216, 84, bg=CARD, radius=20, action=f"filter:{key}", name=f"category_{key}"))
+        objs.append(icon(x + 16, y + 12, ic, ICON, "white"))
+        objs.append(label(x + 120, y + 12, 80, f"{n:02d}", "dot", 32, TEXT2, "right",
                           name=f"category_{key}_count", dynamic=True))
-        objs.append(label(x + 16, y + 46, 184, text, "medium", 17, TEXT))
+        objs.append(label(x + 12, y + 47, 198, text, "sans", 26, TEXT))
         if key == selected:
             # One ring; the controller moves it onto the selected tile.
-            objs.append(container(x, y, 216, 80, None, 20, border=ACCENT, bw=2, name="category_selected"))
+            objs.append(container(x, y, 216, 84, None, 20, border=ACCENT, bw=3, name="category_selected"))
     return objs
 
 
-def download(digits="", status="Enter the app ID", error=""):
-    objs = header("DOWNLOAD", "Get an app by its ID", page="download", help_topic="ids")
-    objs += qr_code(M, 88, "ideas", 6, "qr:ideas", "button_qr_ideas")
-    objs.append(label(M, 296, 198, "Scan to browse apps", "medium", 15, TEXT))
-    objs.append(label(M, 319, 198, "mosaico-ideas.espressif.com", "sans", 13, TEXT2))
-    objs += enlarge_hint(M, 346, 198)
-    for i, text in enumerate(("Pick an app on your phone", "Type its ID on the keypad")):
-        y = 384 + i * 30
-        objs.append(label(M, y - 3, 22, str(i + 1), "dot", 22, ACCENT))
-        objs.append(label(40, y, 178, text, "sans", 13, TEXT2))
-    # ID display: up to 8 digits use the large face; longer IDs switch to the
-    # compact label (the other label holds a blank glyph, as 0.2 does).
-    objs.append(container(226, 88, 238, 80, CARD, 20))
-    shown = digits + "·" * max(0, 6 - len(digits)) if len(digits) <= 8 else " "
-    objs.append(label(234, 96, 222, shown, "dot", 40, TEXT, "center", name="id_digits", dynamic=True))
-    objs.append(label(234, 105, 222, digits if len(digits) > 8 else " ", "dot", 22, TEXT, "center",
-                      name="id_digits_compact", dynamic=True))
-    objs.append(label(234, 140, 222, " " if error else status, "sans", 13, TEXT2, "center",
-                      name="id_status", dynamic=True))
-    objs.append(label(234, 140, 222, error or " ", "sans", 13, ACCENT, "center", name="id_error",
-                      dynamic=True))
+def download(digits="", looking=False):
+    scan = lambda x: circle_button(x, 14, "qr", "qr:ideas", "button_browse")  # noqa: E731
+    objs = header("DOWNLOAD", page="download", help_topic=None, extra=scan)
+    objs.append(container(M, 96, 448, 64, CARD, 20))
+    # Digits (large or compact) and the status line share the card; the
+    # unused labels hold a blank glyph. Errors appear as the banner.
+    status = "Looking up…" if looking else ("Type the app ID" if not digits else " ")
+    big = digits if digits and len(digits) <= 8 and not looking else " "
+    objs.append(label(24, 106, 432, big, "dot", 44, TEXT, "center", name="id_digits", dynamic=True))
+    objs.append(label(24, 112, 432, digits if len(digits) > 8 and not looking else " ", "dot", 32, TEXT,
+                      "center", name="id_digits_compact", dynamic=True))
+    objs.append(label(24, 112, 432, status, "sans", 26, TEXT2, "center", name="id_status", dynamic=True))
     keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "del", "0", "go"]
     for i, key in enumerate(keys):
-        x, y = 226 + (i % 3) * 82, 180 + (i // 3) * 68
+        x, y = M + (i % 3) * 152, 168 + (i // 3) * 76
         if key == "del":
-            objs.append(button(x, y, 74, 60, bg=BG, border=LINE, bw=2, radius=18,
-                               icon="assets/icons/backspace-26-white.png", action="key:del", name="key_del"))
+            objs.append(button(x, y, 144, 72, bg=BG, border=LINE, bw=2, radius=20,
+                               icon=f"assets/icons/backspace-{ICON}-white.png", action="key:del", name="key_del"))
         elif key == "go":
-            objs.append(button(x, y, 74, 60, bg=ACCENT, radius=18, icon="assets/icons/arrow-26-white.png",
+            objs.append(button(x, y, 144, 72, bg=ACCENT, radius=20, icon=f"assets/icons/arrow-{ICON}-white.png",
                                action="key:go", name="key_go"))
         else:
-            objs.append(button(x, y, 74, 60, key, "dot", 32, TEXT, RAISED, radius=18,
+            objs.append(button(x, y, 144, 72, key, "dot", 40, TEXT, RAISED, radius=20,
                                action=f"key:{key}", name=f"key_{key}"))
     return objs
 
 
 DEVELOP_STEPS = [
-    ("Vibe-code it", "Tell your AI agent what to build.\nIt writes the code for you."),
-    ("Install over USB", "Plug in a data cable, then install\nfrom your agent or the website."),
-    ("Share on Mosaico Ideas", "Publish it to get an app ID that\nanyone can download."),
+    ("code", "Vibe-code it", "Scan for the guide", "qr:develop"),
+    ("usb", "Install over USB", "From your agent or the website", None),
+    ("share", "Share on Mosaico Ideas", "Get an ID anyone can use", "qr:ideas"),
 ]
 
 
-def status_value(x, y, w, on_text, off_text, on, name):
-    """Paired labels: orange when on, grey when off (static colours per object)."""
-    return label(x, y, w, on_text if on else off_text, "medium", 15, ACCENT if on else TEXT2, "right",
-                 name=f"{name}_{'on' if on else 'off'}", dynamic=True)
-
-
 def develop(usb=True, agent=True):
-    objs = header("DEVELOP", "Make your own app with AI", page="develop", help_topic="topics")
-    objs += qr_code(M, 88, "develop", 5, "qr:develop", "button_qr_develop")
-    objs.append(label(M, 261, 165, "Vibe-coding guide", "medium", 15, TEXT))
-    objs += enlarge_hint(M, 286, 165, "Tap to enlarge")
-    for i, (title, body) in enumerate(DEVELOP_STEPS):
-        y = 88 + i * 68
-        objs.append(label(197, y - 1, 24, str(i + 1), "dot", 22, ACCENT))
-        objs.append(label(227, y - 1, 237, title, "medium", 17, TEXT))
-        objs.append(label(227, y + 23, 237, body, "sans", 13, TEXT2))
-    objs.append(container(M, 306, 448, 144, CARD, 20))
-    rows = [("usb", "USB data cable", ("Plugged in", "Not plugged in"), usb, "develop_usb"),
-            ("robot", "AI agent or website", ("Connected", "Waiting"), agent, "develop_link")]
-    for i, (ic, text, values, on, name) in enumerate(rows):
-        y = 306 + i * 48
-        if i:
-            objs.append(container(66, y, 382, 1, DIVIDER))
-        objs.append(icon(32, y + 13, ic, 22, "grey"))
-        objs.append(label(66, y + 14, 180, text, "medium", 15, TEXT))
-        objs.append(status_value(244, y + 14, 204, *values, on, name))
-    y = 402
-    objs.append(container(66, y, 382, 1, DIVIDER))
-    objs.append(button(M, y, 448, 48, bg=None, radius=0, action="go:wifi_link", name="button_wifi_link"))
-    objs.append(icon(32, y + 13, "wifi", 22, "grey"))
-    objs.append(label(66, y + 14, 130, "Wi-Fi link", "medium", 15, TEXT))
-    objs.append(label(196, y + 14, 224, "192.168.1.20:7777", "sans", 15, TEXT2, "right",
-                      name="develop_endpoint", dynamic=True))
-    objs.append(icon(428, y + 15, "chevron", 18, "dim"))
+    objs = header("DEVELOP", page="develop", help_topic="develop")
+    text = ("USB connected · AI agent ready" if agent else "USB connected · waiting for agent") if usb \
+        else "Plug in a USB data cable"
+    on = usb and agent
+    objs.append(label(M, 96, 448, f"● {text}", "sans", 22, ACCENT if on else TEXT2,
+                      name="develop_status_on" if on else "develop_status_off", dynamic=True))
+    for i, (ic, title, sub, action) in enumerate(DEVELOP_STEPS):
+        y = 132 + i * 96
+        if action:
+            objs.append(button(M, y, 448, 88, bg=CARD, radius=20, action=action, name=f"button_step_{i + 1}"))
+        else:
+            objs.append(container(M, y, 448, 88, CARD, 20))
+        objs.append(icon(32, y + 28, ic, ICON, "white"))
+        objs.append(label(80, y + 10, 330, title, "medium", 28, TEXT))
+        objs.append(label(80, y + 48, 330, sub, "sans", 22, TEXT2))
+        if action:
+            objs.append(icon(420, y + 30, "chevron", 28, "dim"))
     return objs
 
 
 def wifi_link():
-    objs = header("WI-FI LINK", "Install over your network", page="wifilink", help_topic="topics")
-    objs.append(container(M, 88, 448, 160, CARD, 20))
-    objs.append(label(32, 102, 200, "ADDRESS", "medium", 12, TEXT2))
-    objs.append(label(32, 120, 416, "192.168.1.20:7777", "medium", 24, TEXT, name="wifilink_endpoint",
+    objs = header("WI-FI LINK", page="wifilink", help_topic="develop")
+    objs.append(container(M, 96, 448, 264, CARD, 20))
+    objs.append(label(32, 108, 300, "ADDRESS", "medium", 22, TEXT2))
+    objs.append(label(32, 140, 416, "192.168.1.20:7777", "medium", 28, TEXT, name="wifilink_endpoint",
                       dynamic=True))
-    objs.append(container(32, 162, 416, 1, DIVIDER))
-    objs.append(label(32, 174, 200, "TOKEN", "medium", 12, TEXT2))
-    objs.append(label(32, 190, 416, f"{TOKEN[:32]}\n{TOKEN[32:]}", "sans", 15, TEXT, name="wifilink_token",
-                      dynamic=True))
-    objs.append(label(M, 266, 448, "Your AI agent can install apps over Wi-Fi\nwith this address and token.",
-                      "sans", 15, TEXT2))
-    objs.append(label(M, 316, 448, "Keep the token private.", "sans", 15, ACCENT))
+    objs.append(container(32, 188, 416, 1, DIVIDER))
+    objs.append(label(32, 200, 300, "TOKEN", "medium", 22, TEXT2))
+    token_lines = "\n".join(TOKEN[i:i + 16] for i in range(0, 64, 16))
+    objs.append(label(32, 230, 416, token_lines, "sans", 22, TEXT, name="wifilink_token", dynamic=True))
+    objs.append(label(M, 372, 448, "Your AI agent uses these to\ninstall over Wi-Fi.", "sans", 22, TEXT2))
+    objs.append(label(M, 432, 448, "Keep the token private.", "sans", 22, ACCENT))
     return objs
+
+
+def detail_app(mode):
+    return {"current": BY_ID[CURRENT], "local": BY_ID["100012"], "remote_new": BY_ID["238114"],
+            "remote_update": dict(BY_ID["100006"], version=STORE_UPDATES["100006"])}[mode]
+
+
+def facts(app):
+    source = "Official" if app["official"] else "Community"
+    return f"{CATEGORY_LABEL[app['category']]} · {source} · v{app['version']} · {app['size']}"
 
 
 def detail(mode="current", confirm=False, app=None):
     remote = mode in ("remote_new", "remote_update")
-    if app is None:
-        app = {"current": BY_ID[CURRENT], "local": BY_ID["100009"], "remote_new": BY_ID["238114"],
-               "remote_update": dict(BY_ID["100006"], version=STORE_UPDATES["100006"])}[mode]
-    fav = app["id"] in FAV
-    subtitle = "On Mosaico Ideas" if remote else "Saved on this device"
+    app = app or detail_app(mode)
     extra = None
     if not remote:
         def extra(x):
-            if fav:
-                return circle_button(x, 16, "star_fill", "app:favorite", "button_favorite_on", color="orange")
-            return circle_button(x, 16, "star", "app:favorite", "button_favorite_off")
-    objs = header("APP", subtitle, page="detail", help_topic="ids", extra=extra)
-    objs += tile(M, 88, 64, initial(app), 18, 40, name="detail")
-    objs.append(label(92, 87, 372, app["name"], "medium", 20, TEXT, name="detail_name", dynamic=True))
-    objs.append(label(92, 115, 200, app["id"], "dot", 22, ACCENT, name="detail_id", dynamic=True))
-    objs.append(label(92, 140, 372, f"v{app['version']} · {app['size']}", "sans", 15, TEXT2,
-                      name="detail_meta", dynamic=True))
-    # The app's own page on Mosaico Ideas: the device encodes the store URL at runtime.
-    objs += qr_code(M, 170, f"app-{app['id']}", 5, "qr:app", "button_qr_app")
-    objs.append(label(197, 170, 267, app["summary"], "sans", 15, TEXT2, h=line_h("sans", 15, 4),
-                      name="detail_summary", dynamic=True, wrap=True))
-    objs.append(container(197, 250, 267, 1, DIVIDER))
-    source = "Official" if app["official"] else "Community"
-    objs.append(label(197, 258, 267, f"{CATEGORY_LABEL[app['category']]} · {source}", "sans", 15, TEXT2,
-                      name="detail_facts", dynamic=True))
+            if app["id"] in FAV:
+                return circle_button(x, 14, "star_fill", "app:favorite", "button_favorite_on", color="orange")
+            return circle_button(x, 14, "star", "app:favorite", "button_favorite_off")
+    objs = header("APP", page="detail", help_topic=None, extra=extra)
+    objs += tile(M, 96, 96, initial(app), 24, 64, name="detail")
+    objs.append(label(128, 100, 336, app["name"], "medium", 34, TEXT, name="detail_name", dynamic=True))
+    objs.append(label(128, 148, 220, app["id"], "dot", 32, ACCENT, name="detail_id", dynamic=True))
     local = BY_ID.get(app["id"])
     status = {"current": "● Current app", "local": "Saved · not running", "remote_new": "Not on this device",
-              "remote_update": f"Update · v{local['version'] if local else '?'} → v{app['version']}"}[mode]
+              "remote_update": f"Update v{local['version'] if local else '?'} → v{app['version']}"}[mode]
     accent = mode in ("current", "remote_update")
-    objs.append(label(197, 283, 267, status, "medium", 15, ACCENT if accent else TEXT,
+    objs.append(label(M, 204, 448, status, "medium", 28, ACCENT if accent else TEXT,
                       name="detail_status_accent" if accent else "detail_status", dynamic=True))
-    objs += enlarge_hint(197, 314, 267, "Scan for the full description")
+    objs.append(label(M, 244, 448, facts(app), "sans", 22, TEXT2, name="detail_facts", dynamic=True))
+    info = f"assets/icons/info-{ICON}-white.png"
     if remote:
-        objs.append(primary(M, 344, 448, "Download & run", "store:run", "button_primary", "download", h=52))
-        objs.append(secondary(M, 404, 216, "Download only", "store:keep", "button_secondary",
-                              "assets/icons/download-20-white.png", h=52))
-        objs.append(secondary(248, 404, 216, "Cancel", "back", "button_tertiary", h=52))
+        objs.append(primary(M, 288, 448, "Download & run", "store:run", "button_primary", "download"))
+        objs.append(stack_button(M, 376, 144, 88, f"assets/icons/download-{ICON}-white.png", "Save only",
+                                 "store:keep", "button_secondary"))
+        objs.append(stack_button(168, 376, 144, 88, info, "About", "go:about", "button_about"))
+        objs.append(stack_button(320, 376, 144, 88, f"assets/icons/close-{ICON}-white.png", "Cancel",
+                                 "back", "button_tertiary"))
     else:
-        text = "Open" if mode == "current" else "Run this app"
-        objs.append(primary(M, 344, 448, text, "app:run", "button_primary", "play", h=52))
-        objs.append(secondary(M, 404, 216, "Update", "app:update", "button_secondary",
-                              "assets/icons/refresh-20-white.png", h=52))
+        objs.append(primary(M, 288, 448, "Open" if mode == "current" else "Run this app", "app:run",
+                            "button_primary", "play"))
+        objs.append(stack_button(M, 376, 144, 88, f"assets/icons/refresh-{ICON}-white.png", "Update",
+                                 "app:update", "button_secondary"))
         if confirm:
-            objs.append(button(248, 404, 216, 52, "Tap again to delete", "medium", 15, WHITE, ACCENT,
-                               action="app:delete", name="button_delete_confirm"))
+            objs.append(stack_button(168, 376, 144, 88, f"assets/icons/trash-{ICON}-white.png", "Tap again",
+                                     "app:delete", "button_delete_confirm", color=WHITE, bg=ACCENT, border=None))
         else:
-            objs.append(secondary(248, 404, 216, "Delete", "app:delete_ask", "button_tertiary",
-                                  "assets/icons/trash-20-orange.png", h=52, color=ACCENT))
+            objs.append(stack_button(168, 376, 144, 88, f"assets/icons/trash-{ICON}-orange.png", "Delete",
+                                     "app:delete_ask", "button_tertiary", color=ACCENT))
+        objs.append(stack_button(320, 376, 144, 88, info, "About", "go:about", "button_about"))
     return objs
 
 
-def qr_full(name="app-100001", title="Scan with your phone camera",
-            url="mosaico-ideas.espressif.com/app/100001"):
-    """Any QR code, enlarged to 12 px modules. Tap anywhere or press AI to close."""
-    size = QR_MODULES * 12
-    return [image((W - size) // 2, 14, f"assets/qr/{name}.png", name="qr_full_code", w=size, h=size, qr=True),
-            label(M, 420, 448, title, "medium", 15, TEXT, "center", name="qr_full_title", dynamic=True),
-            label(M, 441, 448, url, "sans", 13, TEXT2, "center", name="qr_full_url", dynamic=True),
+SUMMARY_W, SUMMARY_LINES = 238, 7
+
+
+def about(app=None):
+    """Second detail screen: store summary and the app's Mosaico Ideas QR code."""
+    app = app or BY_ID[CURRENT]
+    objs = header("ABOUT", page="about", help_topic=None)
+    objs.append(label(M, 96, 448, app["name"], "medium", 28, TEXT, name="about_name", dynamic=True))
+    objs += qr_code(M, 140, f"app-{app['id']}", 6, "qr:app", "button_qr_app")
+    objs.append(label(226, 140, SUMMARY_W, app["summary"], "sans", 26, TEXT2,
+                      h=line_h("sans", 26, SUMMARY_LINES), name="about_summary", dynamic=True, wrap=True))
+    objs.append(icon(M, 350, "expand", 28, "grey"))
+    objs.append(label(52, 350, 170, "Tap to enlarge", "sans", 22, TEXT2))
+    objs.append(label(M, 404, 448, facts(app), "sans", 22, TEXT2, name="about_facts", dynamic=True))
+    return objs
+
+
+def qr_full(name="app-100001", title="Pixel Pet on Mosaico Ideas", url="mosaico-ideas.espressif.com/app/100001"):
+    """Any QR code, enlarged to 11 px modules. Tap anywhere or press AI to close."""
+    size = QR_MODULES * 11
+    return [image((W - size) // 2, 10, f"assets/qr/{name}.png", name="qr_full_code", w=size, h=size, qr=True),
+            label(M, 382, 448, title, "medium", 28, TEXT, "center", name="qr_full_title", dynamic=True),
+            label(M, 422, 448, url, "sans", 22, TEXT2, "center", name="qr_full_url", dynamic=True),
             button(0, 0, W, H, bg=None, radius=0, action="back", name="button_qr_close")]
 
 
 def progress_page(kind="agent"):
     spec = {
         "agent": ("FROM YOUR AI AGENT · USB", "Installing your app", "hello_world · v0.2.1",
-                  42, "1.20 MB of 2.85 MB", "236 KB/s", "Step 1 of 2 · Receiving", False),
+                  42, "1.20 of 2.85 MB · 236 KB/s", "Step 1 of 2 · Receiving", False),
         "download": ("FROM MOSAICO IDEAS", "Downloading", "Retro Snake · v1.0.3",
-                     67, "0.61 MB of 0.92 MB", "512 KB/s", "File 2 of 3", True),
+                     67, "0.61 of 0.92 MB · 512 KB/s", "File 2 of 3", True),
         "install": ("FROM YOUR LIBRARY", "Switching apps", "Weather Station · v2.0.1",
-                    88, "2.11 MB of 2.40 MB", "1.6 MB/s", "Step 2 of 2 · Writing", False),
+                    88, "2.11 of 2.40 MB · 1.6 MB/s", "Step 2 of 2 · Writing", False),
     }[kind]
-    caption, title, detail_text, pct, size_text, rate, step, cancel = spec
-    objs = [label(M, 31, 448, caption, "medium", 12, ACCENT, name="progress_caption", dynamic=True),
-            label(M, 52, 448, title, "medium", 28, TEXT, name="progress_title", dynamic=True),
-            label(M, 92, 448, detail_text, "sans", 15, TEXT2, name="progress_detail", dynamic=True),
-            label(M, 126, 448, f"{pct}%", "dot", 112, TEXT, "center", name="progress_percent", dynamic=True),
-            progress(M, 252, 448, 8, pct),
-            label(M, 274, 280, size_text, "sans", 15, TEXT2, name="progress_bytes", dynamic=True),
-            label(296, 274, 168, rate, "medium", 15, TEXT, "right", name="progress_rate", dynamic=True),
-            label(M, 302, 448, step, "sans", 13, TEXT3, name="progress_step", dynamic=True)]
-    objs.append(container(M, 352, 448, 1, DIVIDER))
-    objs.append(icon(M + 2, 368, "power", 20, "orange"))
-    objs.append(label(46, 368, 300, "Keep the device powered", "sans", 15, TEXT2))
+    caption, title, detail_text, pct, size_text, step, cancel = spec
+    objs = [label(M, 22, 448, caption, "medium", 22, ACCENT, name="progress_caption", dynamic=True),
+            label(M, 56, 448, title, "medium", 34, TEXT, name="progress_title", dynamic=True),
+            label(M, 104, 448, detail_text, "sans", 26, TEXT2, name="progress_detail", dynamic=True),
+            label(M, 148, 448, f"{pct}%", "dot", 120, TEXT, "center", name="progress_percent", dynamic=True),
+            progress(M, 282, 448, 10, pct),
+            label(M, 304, 448, size_text, "sans", 22, TEXT2, name="progress_bytes", dynamic=True),
+            label(M, 336, 448, step, "sans", 22, TEXT3, name="progress_step", dynamic=True)]
     if cancel:
-        objs.append(secondary(M, 404, 448, "Cancel download", "store:cancel", "button_cancel"))
+        objs.append(secondary(M, 388, 448, "Cancel download", "store:cancel", "button_cancel"))
     else:
-        objs.append(label(M, 420, 448, "The device restarts into the app when done", "sans", 13, TEXT3,
-                          "center"))
+        objs.append(icon(M, 396, "power", 28, "orange"))
+        objs.append(label(54, 393, 410, "Keep the device powered", "sans", 26, TEXT2))
     return objs
 
 
 def result(kind="installed"):
     spec = {
         "installed": (True, "App installed", "Pixel Pet · v1.2.0", "Restarting into your app…", None),
-        "saved": (True, "Saved to My Apps", "Retro Snake · v1.0.3",
-                  "Open it any time from My Apps.", "Open now"),
+        "saved": (True, "Saved to My Apps", "Retro Snake · v1.0.3", "Open it any time\nfrom the list.",
+                  "Open now"),
         "failed": (False, "Couldn't download", "Retro Snake · v1.0.3",
-                   "The connection dropped. Check Wi-Fi\nand try again.", "Try again"),
+                   "The connection dropped.\nCheck Wi-Fi and try again.", "Try again"),
     }[kind]
     ok, title, caption, body, second = spec
-    objs = [container(192, 72, 96, 96, BG, 48, border=ACCENT if ok else TEXT3, bw=3, name="result_ring"),
-            icon(220, 100, "check" if ok else "close", 40, "orange" if ok else "grey", "result_icon"),
-            label(M, 190, 448, title, "medium", 28, TEXT, "center", name="result_title", dynamic=True),
-            label(M, 232, 448, caption, "sans", 15, TEXT2, "center", name="result_caption", dynamic=True),
-            label(40, 270, 400, body, "sans", 15, TEXT2, "center", name="result_detail", dynamic=True)]
+    objs = [container(180, 40, 120, 120, BG, 60, border=ACCENT if ok else TEXT3, bw=4, name="result_ring"),
+            icon(216, 76, "check" if ok else "close", 48, "orange" if ok else "grey", "result_icon"),
+            label(M, 180, 448, title, "medium", 34, TEXT, "center", name="result_title", dynamic=True),
+            label(M, 228, 448, caption, "sans", 26, TEXT2, "center", name="result_caption", dynamic=True),
+            label(40, 270, 400, body, "sans", 22, TEXT2, "center", name="result_detail", dynamic=True)]
     if second:
-        objs.append(secondary(M, 396, 216, second, "result:second", "button_result_second"))
-        objs.append(primary(248, 396, 216, "Done", "go:home", "button_done"))
+        objs.append(secondary(M, 388, 216, second, "result:second", "button_result_second"))
+        objs.append(primary(248, 388, 216, "Done", "go:home", "button_done"))
     else:
-        objs.append(primary(M, 396, 448, "Done", "go:home", "button_done"))
+        objs.append(primary(M, 388, 448, "Done", "go:home", "button_done"))
     if not ok:
-        objs.append(circle_button(W - M - 48, 16, "help", "help:fix", "button_help_result"))
+        objs.append(circle_button(W - M - BTN, 14, "help", "help:fix", "button_help_result"))
     return objs
 
 
 HELP_TOPICS = [
-    ("start", "flag", "Getting started", "Enter Vibe Mode, AI key, favorites"),
-    ("develop", "code", "Develop apps", "Vibe coding, USB install, sharing"),
-    ("ids", "hash", "App IDs & sharing", "Find, share and download apps"),
-    ("fix", "support", "Troubleshooting", "Wi-Fi, failed installs, recovery"),
+    ("start", "flag", "Getting started"),
+    ("develop", "code", "Develop apps"),
+    ("ids", "hash", "App IDs & sharing"),
+    ("fix", "support", "Troubleshooting"),
 ]
-HELP_TEXT = {
-    "start": ("Getting started", "flag", "help-start",
-              ["Hold AI, then double-press\npower to come back here.",
-               "Press AI to go back.\nDouble-press AI to switch.",
-               "Star apps to find them\nfast in Favorites."]),
-    "develop": ("Develop apps", "code", "develop",
-                ["Vibe-code with your AI\nagent on a computer.",
-                 "Install over a USB data\ncable; watch it here.",
-                 "Share on Mosaico Ideas\nto get an app ID."]),
-    "ids": ("App IDs & sharing", "hash", "help-ids",
-            ["Every app has a number ID,\nusually 6 digits.",
-             "Share an app by telling\nfriends its ID.",
-             "The same ID always gets\nthe newest version."]),
-    "fix": ("Troubleshooting", "support", "help-fix",
-            ["Check Wi-Fi and try\nagain.",
-             "Keep the device powered\nwhile installing.",
-             "Still stuck? Scan for the\nrecovery guide."]),
-}
+HELP_TEXT = {key: (title, ic, {"develop": "develop"}.get(key, f"help-{key}")) for key, ic, title in HELP_TOPICS}
 # Short form of each QR payload, shown under the code.
 QR_URLS = {
     "ideas": "mosaico-ideas.espressif.com",
@@ -732,184 +713,187 @@ QR_URLS = {
 
 
 def help_topics():
-    objs = header("HELP", "Scan a code to read the guide", page="help", help_topic=None)
-    for i, (key, icon_name, title, desc) in enumerate(HELP_TOPICS):
-        y = 88 + i * 76
-        objs.append(button(M, y, 448, 68, bg=CARD, radius=18, action=f"help:{key}", name=f"topic_{key}"))
-        objs.append(icon(34, y + 22, icon_name, 24, "white"))
-        objs.append(label(72, y + 11, 330, title, "medium", 17, TEXT))
-        objs.append(label(72, y + 38, 330, desc, "sans", 13, TEXT2))
-        objs.append(icon(418, y + 25, "chevron", 18, "dim"))
-    objs.append(secondary(M, 404, 448, "Replay guide", "guide:1", "button_replay",
-                          "assets/icons/replay-20-white.png"))
+    replay = lambda x: circle_button(x, 14, "replay", "guide:1", "button_replay")  # noqa: E731
+    objs = header("HELP", page="help", help_topic=None, extra=replay)
+    for i, (key, icon_name, title) in enumerate(HELP_TOPICS):
+        y = 96 + i * 92
+        objs.append(button(M, y, 448, 84, bg=CARD, radius=20, action=f"help:{key}", name=f"topic_{key}"))
+        objs.append(icon(32, y + 26, icon_name, ICON, "white"))
+        objs.append(label(80, y + 24, 330, title, "medium", 28, TEXT))
+        objs.append(icon(420, y + 28, "chevron", 28, "dim"))
     return objs
 
 
 def help_topic(key="start"):
-    title, icon_name, qr_name, points = HELP_TEXT[key]
-    objs = header("HELP", "Scan for the full guide", back="back", page="topic", help_topic=None)
-    objs += qr_code(M, 88, qr_name, 6, f"qr:{qr_name}", "button_qr_topic")
-    host, _, path = QR_URLS[qr_name].partition("/")
-    objs.append(label(M, 294, 198, f"{host}\n/{path}" if path else host, "sans", 13, TEXT2, "center",
-                      name="topic_url", dynamic=True))
-    objs += enlarge_hint(M + 44, 336, 154, "Tap to enlarge")
-    objs.append(icon(226, 92, icon_name, 24, "white", "topic_icon"))
-    objs.append(label(226, 124, 238, title, "medium", 20, TEXT, name="topic_title", dynamic=True))
-    y = 124 + line_h("medium", 20) + 14
-    for i, point in enumerate(points):
-        objs.append(container(226, y + 8, 6, 6, ACCENT, 3))
-        objs.append(label(240, y, 224, point, "sans", 15, TEXT2, name=f"topic_point_{i}", dynamic=True))
-        y += line_h("sans", 15, point.count("\n") + 1) + 12
-    objs.append(secondary(M, 404, 448, "All help topics", "help:topics", "button_topics"))
+    title, icon_name, qr_name = HELP_TEXT[key]
+    objs = header("HELP", back="back", page="topic", help_topic=None)
+    objs.append(icon(M, 99, icon_name, ICON, "white", "topic_icon"))
+    objs.append(label(60, 96, 404, title, "medium", 28, TEXT, name="topic_title", dynamic=True))
+    objs += qr_code(108, 140, qr_name, 8, f"qr:{qr_name}", "button_qr_topic")
+    objs.append(label(M, 414, 448, QR_URLS[qr_name], "sans", 22, TEXT2, "center", name="topic_url",
+                      dynamic=True))
     return objs
 
 
 def wifi(pending=False):
-    sub = "Connect to continue your download" if pending else "Apps use this network too"
-    objs = header("WI-FI", sub, page="wifi", help_topic="fix")
-    objs.append(container(M, 88, 448, 72, CARD, 20))
-    objs.append(icon(34, 113, "wifi", 22, "grey"))
-    objs.append(label(68, 96, 280, "Studio-5G", "medium", 20, TEXT, name="wifi_connection", dynamic=True))
-    objs.append(label(68, 123, 280, "Connected · 192.168.1.20", "sans", 15, TEXT2, name="wifi_detail",
-                      dynamic=True))
-    objs.append(secondary(360, 102, 92, "Forget", "wifi:forget", "button_forget", h=44))
-    objs[-1]["size"] = 15
-    objs.append(label(M, 186, 300, "NETWORKS · 4", "medium", 12, TEXT2, name="wifi_scan", dynamic=True))
-    objs.append(button(368, 172, 96, 44, "Scan", "medium", 15, TEXT, BG, border=LINE, bw=2,
-                       icon="assets/icons/refresh-20-white.png", action="wifi:scan", name="button_scan",
-                       icon_gap=6))
-    viewport = (M, 228, 448, 228)
-    objs.append({"type": "list_viewport", "x": M, "y": 228, "w": 448, "h": 228, "name": "networks",
-                 "item_height": NET_ITEM_H, "row_template": "networks_row"})
-    for i, (ssid, info) in enumerate(NETWORKS[:4]):
-        objs += network_row(M, 228 + i * NET_ITEM_H, ssid, info, viewport)
+    objs = header("WI-FI", page="wifi", help_topic="fix")
+    objs.append(container(M, 96, 448, 88, CARD, 20))
+    objs.append(icon(32, 124, "wifi", ICON, "grey"))
+    objs.append(label(76, 104, 252, "Studio-5G", "medium", 28, TEXT, name="wifi_connection", dynamic=True))
+    objs.append(label(76, 142, 252, "Connected", "sans", 22, TEXT2, name="wifi_detail", dynamic=True))
+    objs.append(secondary(336, 104, 116, "Forget", "wifi:forget", "button_forget", h=72))
+    objs[-1]["size"] = 22
+    if pending:
+        objs.append(label(M, 210, 360, "PICK ONE TO CONTINUE", "medium", 22, ACCENT, name="wifi_scan_accent",
+                          dynamic=True))
+    else:
+        objs.append(label(M, 210, 360, "NETWORKS · 4", "medium", 22, TEXT2, name="wifi_scan", dynamic=True))
+    objs.append(circle_button(392, 192, "refresh", "wifi:scan", "button_scan"))
+    viewport = (M, 272, 448, 192)
+    objs.append({"type": "list_viewport", "x": M, "y": 272, "w": 448, "h": 192, "name": "networks",
+                 "item_height": NET_ITEM_H, "row_template": "networks_row", "count": len(NETWORKS)})
+    for i, (ssid, info) in enumerate(NETWORKS[:2]):
+        objs += network_row(M, 272 + i * NET_ITEM_H, ssid, info, viewport)
     return objs
 
 
-def text_entry(page, title, subtitle, display, placeholder, note, hint, toggle=None, note_color=TEXT2):
-    """Keyboard entry page shared by the Wi-Fi password, the city and the AI token."""
-    objs = header(title, subtitle, page=page, help_topic=None)
-    objs.append(container(M, 88, 448, 64, CARD, 18))
-    objs.append(label(34, 108, 340, display or placeholder, "medium", 20, TEXT if display else TEXT3,
-                      name=f"{page}_display", dynamic=True))
+def text_entry(page, title, display, placeholder, note, toggle=None, note_color=TEXT2):
+    """Fallback keyboard page shared by the Wi-Fi password, the city and the AI token."""
+    objs = header(title, page=page, help_topic=None)
+    objs.append(container(M, 96, 448, 72, CARD, 20))
+    objs.append(label(32, 114, 336 if toggle is not None else 416, display or placeholder, "medium", 28,
+                      TEXT if display else TEXT3, name=f"{page}_display", dynamic=True))
     if toggle is not None:
-        objs.append(button(392, 96, 56, 48, bg=RAISED, radius=16,
-                           icon=f"assets/icons/{'eye' if toggle else 'eye_off'}-24-white.png",
+        objs.append(button(376, 96, 88, 72, bg=RAISED, radius=20,
+                           icon=f"assets/icons/{'eye' if toggle else 'eye_off'}-{ICON}-white.png",
                            action=f"{page}:toggle", name=f"button_toggle_{page}"))
-    objs.append(label(M, 165, 448, note, "sans", 15, note_color, name=f"{page}_note", dynamic=True))
-    objs.append(label(M, 196, 448, hint, "sans", 13, TEXT3))
+    objs.append(label(M, 182, 448, note, "sans", 22, note_color, name=f"{page}_note", dynamic=True))
     objs.append(keyboard(name=f"{page}_keyboard"))
     return objs
 
 
 def password(masked=True, error=""):
-    return text_entry("password", "PASSWORD", "Studio-5G", "••••••••••" if masked else "makers2026",
-                      "Type the Wi-Fi password", error or " ", "Up to 64 characters", toggle=masked,
-                      note_color=ACCENT)
+    return text_entry("password", "PASSWORD", "••••••••••" if masked else "makers2026", "Type the password",
+                      error or "Or set it from your computer.", toggle=masked,
+                      note_color=ACCENT if error else TEXT2)
+
+
+def city_input():
+    return text_entry("city_input", "CITY", "Shanghai", "Type your city", "Letters and spaces, up to 40.")
+
+
+def token_input():
+    return text_entry("token_input", "AI TOKEN", "•" * 8 + AI_TOKEN[-4:], "Type your token",
+                      "Every app can read it.", toggle=True, note_color=ACCENT)
+
+
+def from_computer(y, h, lines):
+    """Card that points to the main way of setting shared values: the computer over USB."""
+    return [container(M, y, 448, h, CARD, 20),
+            icon(32, y + 20, "usb", ICON, "white"),
+            label(76, y + 16, 372, lines, "sans", 26, TEXT)]
 
 
 def city():
-    return text_entry("city", "CITY", "Shared with all apps", "Shanghai", "Type your city",
-                      "Apps use it for weather and local info.", "Up to 40 characters")
+    objs = header("CITY", page="city", help_topic=None)
+    objs.append(container(M, 96, 448, 96, CARD, 20))
+    objs.append(label(32, 106, 416, "Shared with all apps", "sans", 22, TEXT2))
+    objs.append(label(32, 138, 416, "Shanghai", "medium", 34, TEXT, name="city_value", dynamic=True))
+    objs += from_computer(208, 164, "Set it from your computer:\nask your AI agent while\nthe USB cable is in.")
+    objs.append(secondary(M, 388, 448, "Type on device", "go:city_input", "button_type_city"))
+    return objs
 
 
 def token():
-    masked = "•" * 12 + AI_TOKEN[-4:]
-    return text_entry("token", "AI TOKEN", "Shared with all apps", masked, "Type your token",
-                      "Every app on this device can read it.", "Long token? Set it from your computer.",
-                      toggle=True, note_color=ACCENT)
+    objs = header("AI TOKEN", page="token", help_topic=None)
+    objs.append(container(M, 96, 448, 124, CARD, 20))
+    objs.append(label(32, 106, 416, "Shared with all apps", "sans", 22, TEXT2))
+    objs.append(label(32, 138, 416, f"Set · ends in {AI_TOKEN[-4:]}", "medium", 28, TEXT, name="token_value",
+                      dynamic=True))
+    objs.append(label(32, 180, 416, "Every app can read it.", "sans", 22, ACCENT))
+    objs += from_computer(232, 140, "Paste it on your computer:\nask your AI agent over USB.")
+    objs.append(secondary(M, 388, 216, "Type it", "go:token_input", "button_type_token"))
+    objs.append(secondary(248, 388, 216, "Clear", "token:clear", "button_clear_token", color=ACCENT))
+    return objs
 
 
 def device():
-    objs = header("DEVICE", "Vibe Mode 0.3.0 · ESP32-S31", page="device", help_topic="fix")
-    objs.append(section(84, "SHARED WITH APPS"))
-    objs.append(container(M, 104, 448, 144, CARD, 20))
-    shared = [("wifi", "Wi-Fi", "Studio-5G", "go:wifi", "device_wifi"),
-              ("pin", "City", "Shanghai", "go:city", "device_city"),
-              ("key", "AI token", f"Set · ends in {AI_TOKEN[-4:]}", "go:token", "device_token")]
-    for i, (ic, text, value, action, value_name) in enumerate(shared):
-        y = 104 + i * 48
-        if i:
-            objs.append(container(66, y, 382, 1, DIVIDER))
-        objs.append(button(M, y, 448, 48, bg=None, radius=0, action=action, name=f"button_{value_name}"))
-        objs.append(icon(32, y + 13, ic, 22, "grey"))
-        objs.append(label(66, y + 14, 130, text, "medium", 15, TEXT))
-        objs.append(label(196, y + 14, 224, value, "sans", 15, TEXT2, "right", name=value_name, dynamic=True))
-        objs.append(icon(428, y + 15, "chevron", 18, "dim"))
-    objs.append(label(M, 253, 448, "Every app can read these. Only Vibe Mode can change them.", "sans", 13,
-                      TEXT3))
-    objs.append(section(282, "THIS DEVICE"))
-    objs.append(container(M, 302, 448, 144, CARD, 20))
-    rows = [("chip", "Vibe Mode", "0.3.0", "device_version"),
-            ("id", "MAC address", "30:ED:A0:F4:60:56", "device_mac"),
-            ("storage", "App storage", f"{len(LIBRARY)} apps · {sum(float(a['size'].split()[0]) for a in LIBRARY):.1f} MB used",
-             "device_storage")]
-    for i, (ic, text, value, value_name) in enumerate(rows):
-        y = 302 + i * 48
-        if i:
-            objs.append(container(66, y, 382, 1, DIVIDER))
-        objs.append(icon(32, y + 13, ic, 22, "grey"))
-        objs.append(label(66, y + 14, 150, text, "medium", 15, TEXT))
-        objs.append(label(206, y + 14, 242, value, "sans", 15, TEXT2, "right", name=value_name, dynamic=True))
-    objs.append(label(M, 451, 448, "App downloads send this device's MAC and version.", "sans", 13, TEXT3,
-                      "center"))
+    objs = header("DEVICE", page="device", help_topic="fix")
+    objs.append(label(M, 94, 448, "Shared with every app", "sans", 22, TEXT2))
+    used = sum(float(a["size"].split()[0]) for a in LIBRARY)
+    rows = [(128, "wifi", "Wi-Fi", "Studio-5G", "go:wifi", "button_device_wifi", "device_wifi"),
+            (216, "pin", "City", "Shanghai", "go:city", "button_device_city", "device_city"),
+            (304, "key", "AI token", f"Set · ends in {AI_TOKEN[-4:]}", "go:token", "button_device_token",
+             "device_token"),
+            (392, "chip", "This device", f"Vibe Mode 0.3.0 · {len(LIBRARY)} apps", "go:device_info",
+             "button_device_info", "device_summary")]
+    for y, ic, title, value, action, name, value_name in rows:
+        objs += card_row(y, ic, title, value, action, name, value_name)
+    objs[-1]["name"] = None
+    assert used > 0
+    return objs
+
+
+def device_info():
+    objs = header("THIS DEVICE", page="info", help_topic=None)
+    used = sum(float(a["size"].split()[0]) for a in LIBRARY)
+    objs += card_row(96, "chip", "Vibe Mode", "0.3.0 · ESP32-S31", value_name="device_version")
+    objs += card_row(184, "id", "MAC address", "30:ED:A0:F4:60:56", value_name="device_mac")
+    objs += card_row(272, "storage", "App storage", f"{len(LIBRARY)} apps · {used:.1f} MB used",
+                     value_name="device_storage")
+    objs += card_row(360, "wifi", "Wi-Fi link", "192.168.1.20:7777", "go:wifi_link", "button_wifi_link",
+                     "device_endpoint")
+    objs.append(label(M, 446, 448, "Downloads send MAC and version.", "sans", 22, TEXT3, "center"))
     return objs
 
 
 def guide(step=1):
-    objs = [label(M, 26, 120, f"0{step}/04", "dot", 22, TEXT2, name="guide_step", dynamic=True),
-            button(W - M - 92, 16, 92, 44, "Skip", "medium", 15, TEXT2, BG, action="guide:done",
-                   name="button_skip")]
+    objs = [label(20, 26, 140, f"0{step}/04", "dot", 32, TEXT2, name="guide_step", dynamic=True),
+            button(344, 12, 120, BTN, "Skip", "medium", 28, TEXT2, BG, action="guide:done", name="button_skip")]
     if step == 1:
-        title_w = int(text_width("VIBE MODE", "dot", 56))
-        objs.append(label(M, 100, 448, "VIBE MODE", "dot", 56, TEXT))
-        objs.append(container(M + title_w + 6, 133, 12, 12, ACCENT, 6))
-        objs.append(label(M, 192, 448, "A safe home for\nyour apps", "medium", 28, TEXT))
-        objs.append(label(M, 286, 448, "Your AI agent installs apps here, and you\n"
-                          "can watch every step. Switch apps, get new\nones by ID, and come back any time.",
-                          "sans", 15, TEXT2))
+        title_w = int(text_width("VIBE MODE", "dot", 64))
+        objs.append(label(M, 104, 448, "VIBE MODE", "dot", 64, TEXT))
+        objs.append(container(M + title_w + 6, 150, 14, 14, ACCENT, 7))
+        objs.append(label(M, 190, 448, "A safe home for\nyour apps", "medium", 34, TEXT))
+        objs.append(label(M, 292, 448, "Your AI agent installs apps here.\nSwitch or download apps any time.",
+                          "sans", 26, TEXT2))
     elif step == 2:
-        objs.append(label(M, 76, 448, "Coming back here", "medium", 24, TEXT))
-        objs += guide_device(M, 120)
+        objs.append(label(M, 88, 448, "Coming back here", "medium", 34, TEXT))
+        objs += guide_device(M, 140)
         # Step numbers sit next to the ringed keys in the drawing.
-        objs.append(label(M + 164, 125, 22, "1", "dot", 22, ACCENT))
-        objs.append(label(M + 164, 291, 22, "2", "dot", 22, ACCENT))
-        steps = (("1", "Hold the AI key", "Top edge, on the right.\nKeep holding it."),
-                 ("2", "Double-press power", "Bottom edge, on the right.\nThe device restarts."),
-                 ("3", "Release AI", "When the Vibe Mode\nscreen appears."))
+        objs.append(label(M + 166, 143, 28, "1", "dot", 32, ACCENT))
+        objs.append(label(M + 166, 300, 28, "2", "dot", 32, ACCENT))
+        steps = (("1", "Hold AI", "Top edge, right"), ("2", "Press power", "Bottom right ×2"),
+                 ("3", "Release AI", "On this screen"))
         for i, (num, head, sub) in enumerate(steps):
-            y = 124 + i * 76
-            objs.append(label(234, y - 2, 30, num, "dot", 32, ACCENT))
-            objs.append(label(268, y + 1, 196, head, "medium", 17, TEXT))
-            objs.append(label(268, y + 26, 196, sub, "sans", 13, TEXT2))
+            y = 148 + i * 80
+            objs.append(label(236, y, 32, num, "dot", 32, ACCENT))
+            objs.append(label(276, y - 2, 188, head, "medium", 28, TEXT))
+            objs.append(label(276, y + 34, 188, sub, "sans", 22, TEXT2))
     elif step == 3:
-        objs.append(label(M, 76, 448, "Two ways to get apps", "medium", 24, TEXT))
-        cards = (("download", "Download", "Type an app ID from\nMosaico Ideas, or scan\nto browse."),
-                 ("code", "Develop", "Vibe-code with your AI\nagent, install over USB,\nthen share it."))
+        objs.append(label(M, 88, 448, "Two ways to get apps", "medium", 34, TEXT))
+        cards = (("download", "Download", "Type an app ID\nfrom Mosaico\nIdeas."),
+                 ("code", "Develop", "Vibe-code it,\ninstall over USB,\nshare it."))
         for i, (ic, head, body) in enumerate(cards):
             x = M + i * 232
-            objs.append(container(x, 120, 216, 196, CARD, 20))
-            objs.append(icon(x + 18, 138, ic, 24, "white"))
-            objs.append(label(x + 18, 174, 180, head, "medium", 20, TEXT))
-            objs.append(label(x + 18, 206, 184, body, "sans", 15, TEXT2))
-        objs.append(label(M, 340, 448, "Tap ☆ on any app to keep it in Favorites.", "sans", 15, TEXT2,
-                          "center"))
+            objs.append(container(x, 148, 216, 224, CARD, 20))
+            objs.append(icon(x + 18, 166, ic, ICON, "white"))
+            objs.append(label(x + 18, 210, 184, head, "medium", 28, TEXT))
+            objs.append(label(x + 18, 254, 184, body, "sans", 22, TEXT2))
     else:
-        objs.append(label(M, 76, 448, "Your AI key", "medium", 24, TEXT))
-        rows = [("AI", "Go back"), ("AI ×2", "Switch apps"), ("Hold AI", "Open the selected app")]
+        objs.append(label(M, 88, 448, "Your AI key", "medium", 34, TEXT))
+        rows = [("AI", "Go back"), ("AI ×2", "Switch apps"), ("Hold AI", "Open the app")]
         for i, (key, text) in enumerate(rows):
-            y = 124 + i * 60
-            objs.append(button(M, y, 112, 44, key, "medium", 15, TEXT, RAISED, name=f"guide_key_{i}"))
-            objs.append(label(144, y + 12, 320, text, "sans", 15, TEXT))
-        objs.append(container(M, 316, 448, 1, DIVIDER))
-        objs.append(circle_button(M, 334, "help", "help:topics", "guide_help_sample", size=44))
-        objs.append(label(72, 346, 392, "Tap ? on any page for help and QR guides.", "sans", 15, TEXT2))
+            y = 148 + i * 80
+            objs.append(container(M, y, 128, 64, RAISED, 32, name=f"guide_key_{i}"))
+            objs.append(label(M, y + (64 - 35) // 2, 128, key, "medium", 28, TEXT, "center"))
+            objs.append(label(160, y + (64 - 33) // 2, 304, text, "sans", 26, TEXT))
     if step > 1:
-        objs.append(secondary(M, 404, 140, "Back", f"guide:{step - 1}", "button_guide_back"))
-        objs.append(primary(164, 404, 300, "Start" if step == 4 else "Next",
+        objs.append(secondary(M, 388, 140, "Back", f"guide:{step - 1}", "button_guide_back"))
+        objs.append(primary(164, 388, 300, "Start" if step == 4 else "Next",
                             "guide:done" if step == 4 else f"guide:{step + 1}", "button_guide_next"))
     else:
-        objs.append(primary(M, 404, 448, "Next", "guide:2", "button_guide_next"))
+        objs.append(primary(M, 388, 448, "Next", "guide:2", "button_guide_next"))
     return objs
 
 
@@ -923,7 +907,7 @@ def guide_device(x, y):
     """
     hw = TOKENS["hardware"]
     ai_key, keys = (120, 15, 34, 15), [(46, 170, 34, 15), (120, 170, 34, 15)]
-    objs = [container(x + kx - 6, y + ky - 6, kw + 12, kh + 12, None, 9, border=ACCENT, bw=2, name=name)
+    objs = [container(x + kx - 6, y + ky - 6, kw + 12, kh + 12, None, 9, border=ACCENT, bw=3, name=name)
             for (kx, ky, kw, kh), name in ((ai_key, "guide_ring_ai"), (keys[1], "guide_ring_power"))]
     objs.append(container(x + ai_key[0], y + ai_key[1], ai_key[2], ai_key[3], hw["ai_key"], 4))
     for kx, ky, kw, kh in keys:
@@ -939,10 +923,10 @@ def guide_device(x, y):
 def launching(app=None):
     """Restart into an app that is already installed: no Flash write."""
     app = app or BY_ID[CURRENT]
-    objs = tile(180, 120, 120, initial(app), 34, 56, name="launch")
-    objs.append(label(M, 262, 448, f"Opening {app['name']}", "medium", 24, TEXT, "center",
+    objs = tile(180, 110, 120, initial(app), 34, 64, name="launch")
+    objs.append(label(M, 254, 448, f"Opening {app['name']}", "medium", 34, TEXT, "center",
                       name="launch_title", dynamic=True))
-    objs.append(label(M, 298, 448, "Restarting into your app…", "sans", 15, TEXT2, "center"))
+    objs.append(label(M, 306, 448, "Restarting into your app…", "sans", 26, TEXT2, "center"))
     return objs
 
 
@@ -950,28 +934,29 @@ def app_running(app=None):
     """Prototype only: stands in for the user's app after Vibe Mode hands over."""
     app = app or BY_ID[CURRENT]
     objs = [container(0, 0, W, H, "#0A0A0A", 0, role="background")]
-    objs += tile(180, 96, 120, initial(app), 34, 56, name="running", bg=RAISED)
-    objs.append(label(M, 236, 448, app["name"], "medium", 24, TEXT, "center", name="running_title",
+    objs += tile(180, 70, 120, initial(app), 34, 64, name="running", bg=RAISED)
+    objs.append(label(M, 210, 448, app["name"], "medium", 34, TEXT, "center", name="running_title",
                       dynamic=True))
-    objs.append(label(M, 274, 448, "Your app is running", "sans", 15, TEXT2, "center"))
-    objs.append(label(40, 330, 400, "To come back: hold AI, then double-press power.", "sans", 13,
+    objs.append(label(M, 260, 448, "Your app is running", "sans", 26, TEXT2, "center"))
+    objs.append(label(40, 310, 400, "To come back: hold AI,\nthen double-press power.", "sans", 22,
                       TEXT3, "center"))
-    objs.append(secondary(96, 380, 288, "Simulate the gesture", "proto:return", "button_return"))
+    objs.append(secondary(96, 388, 288, "Back to Vibe Mode", "proto:return", "button_return"))
     return objs
 
 
 def prototype_extras():
     extras = [{"id": f"help-topic-{key}", "page": "help_topic", "objects": help_topic(key)}
               for key in HELP_TEXT]
-    extras.append({"id": "wifi-pending", "page": "wifi", "objects": wifi(True)})
     extras.append({"id": "home-category-empty", "page": "home",
                    "objects": home("motor", apps=[a for a in LIBRARY if a["category"] != "motor"])})
+    extras.append({"id": "city-input", "page": "city_input", "objects": city_input()})
+    extras.append({"id": "token-input", "page": "token_input", "objects": token_input()})
     extras.append({"id": "launching", "page": "launching", "objects": launching()})
     extras.append({"id": "app-running", "page": "app_running", "objects": app_running()})
     for extra in extras:
         if extra["page"] != "app_running" and not any(o.get("name") == "ai_cue" for o in extra["objects"]):
             extra["objects"].append(ai_cue())
-    templates = {"apps_row": app_row(0, 0, LIBRARY[0], None),
+    templates = {"apps_row": app_row(0, 0, LIBRARY[1], None),
                  "networks_row": network_row(0, 0, *NETWORKS[0], None)}
     return extras, templates
 
@@ -999,22 +984,22 @@ def build_states():
     add_state("home-empty", "home", "Home · empty library",
               home(agent=False, apps=[], wifi_on=False, battery="low"))
     hint = [o for o in home(agent=False) if o.get("name") != "ai_cue"]
-    add_state("home-ai-hint", "home", "Home · AI pressed (hint toast)",
-              hint + [ai_cue(True)] + ai_toast("Double-press AI to switch apps"))
+    add_state("home-ai-hint", "home", "Home · AI pressed (hint banner)",
+              hint + [ai_cue(True)] + ai_toast("Press AI twice to switch"))
     add_state("quick-switch", "home", "Quick switch (AI ×2)", quick_switch())
-    add_state("categories", "categories", "Categories", categories("smart-home"))
+    add_state("categories", "categories", "Show: all, favorites, categories", categories("smart-home"))
     add_state("download", "download", "Download · empty", download())
-    add_state("download-typing", "download", "Download · typing", download("2381", "Tap → to look it up"))
-    add_state("download-error", "download", "Download · not found",
-              download("404040", error="No app with this ID"))
-    add_state("develop", "develop", "Develop app", develop())
-    add_state("wifi-link", "wifi_link", "Develop · Wi-Fi link", wifi_link())
+    add_state("download-typing", "download", "Download · typing", download("2381"))
+    add_state("download-lookup", "download", "Download · looking up", download("238114", looking=True))
+    add_state("download-error", "download", "Download · not found (banner)",
+              download("404040") + ai_toast("No app with this ID"))
+    add_state("develop", "develop", "Develop", develop())
     add_state("detail-current", "detail", "Detail · current app (favorite)", detail("current"))
-    add_state("detail-local", "detail", "Detail · saved app", detail("local", app=BY_ID["100012"]))
-    add_state("detail-delete", "detail", "Detail · delete confirmation",
-              detail("local", True, app=BY_ID["100012"]))
+    add_state("detail-local", "detail", "Detail · saved app", detail("local"))
+    add_state("detail-delete", "detail", "Detail · delete confirmation", detail("local", True))
     add_state("detail-remote", "detail", "Detail · found on Mosaico Ideas", detail("remote_new"))
     add_state("detail-update", "detail", "Detail · update available", detail("remote_update"))
+    add_state("about", "about", "About · summary and app QR", about())
     add_state("qr-full", "qr", "Any QR code, enlarged", qr_full())
     add_state("progress-agent", "progress", "Progress · from the AI agent", progress_page("agent"))
     add_state("progress-download", "progress", "Progress · download", progress_page("download"))
@@ -1025,10 +1010,13 @@ def build_states():
     add_state("help", "help", "Help topics", help_topics())
     add_state("help-topic", "help_topic", "Help topic with QR", help_topic("develop"))
     add_state("wifi", "wifi", "Wi-Fi", wifi())
+    add_state("wifi-pending", "wifi", "Wi-Fi · to continue a download", wifi(True))
     add_state("password", "password", "Wi-Fi password", password())
     add_state("device", "device", "Device · shared settings", device())
-    add_state("city", "city", "City (shared)", city())
-    add_state("token", "token", "AI token (shared)", token())
+    add_state("device-info", "device_info", "This device", device_info())
+    add_state("wifi-link", "wifi_link", "Wi-Fi link", wifi_link())
+    add_state("city", "city", "City (set from the computer)", city())
+    add_state("token", "token", "AI token (set from the computer)", token())
     return s
 
 
@@ -1051,7 +1039,7 @@ def draw_text(img, draw, obj, text, box, color, align="left", offset=0.0):
         if obj.get("overflow") == "ellipsis":
             text = ellipsize(text, f, w)
         lines = text.split("\n")
-        top = y + (h - lh * len(lines)) / 2
+        top = y + (h - lh * len(lines)) / 2 + obj.get("text_dy", 0)
     for i, line in enumerate(lines):
         tw = f.getlength(line)
         if align == "center":
@@ -1089,11 +1077,11 @@ def draw_keyboard(img, draw, kb):
     for kx, ky, kw, kh, text, color, tcolor in keyboard_keys(kb):
         draw.rounded_rectangle((kx, ky, kx + kw, ky + kh), kb["key_radius"], fill=rgb(color))
         if text == "shift":
-            shift = Image.open(DESIGN / "assets/icons/back-22-white.png").rotate(-90)
-            img.paste(shift, (int(kx) + 17, int(ky) + 14), shift)
+            shift = Image.open(DESIGN / "assets/icons/back-28-white.png").rotate(-90)
+            img.paste(shift, (int(kx) + 14, int(ky) + 11), shift)
         elif text == "del":
-            bs = Image.open(DESIGN / "assets/icons/backspace-26-white.png")
-            img.paste(bs, (int(kx) + 15, int(ky) + 12), bs)
+            bs = Image.open(DESIGN / "assets/icons/backspace-28-white.png")
+            img.paste(bs, (int(kx) + 14, int(ky) + 11), bs)
         else:
             face, size = (ff, kb["function_font_size"]) if tcolor else (f, kb["font_size"])
             tw = face.getlength(text)
@@ -1233,8 +1221,11 @@ def check(states, extras=()) -> list[str]:
                     if not all(inside_screen(px, py) for px, py in outline(*shape)):
                         problems.append(f"{where} crosses the rounded screen corner {shape[:4]}")
                         break
-            if t == "button" and (w < 44 or h < 44):
-                problems.append(f"{where} touch target {w}x{h} is below 44x44")
+            if t == "button" and (w < MIN_TOUCH or h < MIN_TOUCH):
+                problems.append(f"{where} touch target {w}x{h} is below {MIN_TOUCH}x{MIN_TOUCH}")
+            icon_path = obj.get("image") if t == "image" else (obj.get("icon") or {}).get("image")
+            if icon_path and "/icons/" in icon_path and int(Path(icon_path).stem.split("-")[1]) < MIN_ICON:
+                problems.append(f"{where} icon is below {MIN_ICON} px")
             if t == "image" and obj.get("qr") and (w != h or w % QR_MODULES or w // QR_MODULES < 5):
                 problems.append(f"{where} QR size {w}x{h} is not a whole module size >= 5 px")
             if t in ("label", "button") and obj.get("text") and obj["size"] not in TYPE_SCALE[obj["font"]]:
@@ -1261,38 +1252,34 @@ def check(states, extras=()) -> list[str]:
 
 # Every dynamic string variant from the copy table (README section 8), measured
 # against its label. Names and SSIDs ellipsize, so only fixed copy is listed.
+TOASTS = ["Press AI twice to switch", "Press twice, then hold", "No apps in this list", "AI agent connected",
+          "Added to Favorites", "Removed from Favorites", "Download cancelled", "Connect Wi-Fi first",
+          "Getting preset apps", "City saved", "AI token saved", "AI token cleared", "Type an app ID first",
+          "No app with this ID", "This app was removed", "Not for this device", "Download not allowed",
+          "Store is busy. Try later.", "Can't reach the store", "Storage unavailable", "Not enough storage"]
 COPY = [
-    (222, "sans", 13, ["Enter the app ID", "Tap → to look it up", "Looking up…",
-                       "Type an app ID first", "No app with this ID", "This app was removed",
-                       "Not available for this device", "Download not allowed",
-                       "Store is busy. Try again soon.", "Can't reach the store. Check Wi-Fi.",
-                       "Storage unavailable", "Not enough storage"]),
-    (448, "medium", 17, ["Double-press AI to switch apps", "Double-press AI, then hold to open",
-                         "No apps in this list", "Download cancelled", "Connect Wi-Fi to check for updates",
-                         "Added to Favorites", "Removed from Favorites", "AI agent connected",
-                         "City saved", "AI token saved", "AI token cleared", "Getting your preset apps"]),
-    (330, "dot", 40, list(FILTER_TITLES.values())),
-    (122, "medium", 15, [text for _, text, _ in CATEGORIES] + ["Categories", "Other"]),
-    (96, "medium", 12, ["↓ 20/20"]),
-    (228, "medium", 12, [f"QUICK SWITCH · {t}" for t in FILTER_TITLES.values()]),
-    (184, "medium", 17, ["All apps", "Favorites", "Other"] + [text for _, text, _ in CATEGORIES]),
-    (267, "medium", 15, ["Update · v10.12.3 → v10.13.0", "Update available", "Saved · not running",
+    (416, "medium", 28, TOASTS),
+    (432, "sans", 26, ["Type the app ID", "Looking up…"]),
+    (218, "medium", 28, list(FILTER_LABELS.values()) + ["Other"]),
+    (198, "sans", 26, ["All apps", "Favorites", "Other"] + [text for _, text, _ in CATEGORIES]),
+    (120, "medium", 22, ["↓ 20/20"]),
+    (260, "medium", 22, [t.upper() for t in FILTER_LABELS.values()]),
+    (448, "medium", 28, ["Update v10.12.3 → v10.13.0", "Update available", "Saved · not running",
                          "Not on this device", "● Current app"]),
-    (267, "sans", 15, [f"{text} · Community" for _, text, _ in CATEGORIES] + ["Other · Community"]),
-    (246, "sans", 13, ["Communication · 1234567890123456"]),
-    (448, "medium", 12, ["FROM YOUR AI AGENT · WI-FI", "FROM YOUR AI AGENT · USB", "FROM THE WEBSITE · USB",
+    (306, "sans", 22, ["Communication · 123456", "Community app · 123456", "● Current app"]),
+    (448, "medium", 22, ["FROM YOUR AI AGENT · WI-FI", "FROM YOUR AI AGENT · USB", "FROM THE WEBSITE · USB",
                          "FROM YOUR COMPUTER · USB", "FROM MOSAICO IDEAS", "FROM YOUR LIBRARY"]),
-    (448, "medium", 28, ["Installing your app", "Downloading", "Switching apps", "Couldn't install the app",
+    (448, "medium", 34, ["Installing your app", "Downloading", "Switching apps", "Couldn't install the app",
                          "Couldn't download", "Saved to My Apps", "App installed"]),
-    (400, "sans", 15, ["The connection dropped. Check Wi-Fi", "Open it any time from My Apps.",
-                       "Restarting into your app…"]),
-    (448, "sans", 15, ["Use at least 8 characters", "Wrong password. Try again.", "Type a city name first"]),
-    (224, "sans", 15, ["Set · ends in 4c8e", "Not set", "Not connected", "Studio-5G"]),
-    (242, "sans", 15, ["24 apps · 312.4 MB used", "30:ED:A0:F4:60:56"]),
-    (204, "medium", 15, ["Plugged in", "Not plugged in", "Connected", "Waiting"]),
-    (224, "sans", 15, ["192.168.100.200:7777", "Connect Wi-Fi first"]),
-    (300, "medium", 12, ["NETWORKS · 16", "SCANNING…"]),
-    (268, "sans", 15, ["On Mosaico Ideas", "Saved on this device"]),
+    (448, "sans", 22, ["312.40 of 312.40 MB · 1.6 MB/s", "Step 2 of 2 · Verifying", "File 3 of 3 · Checking",
+                       "Use at least 8 characters", "Wrong password. Try again.", "Or set it from your computer.",
+                       "Type a city name first", "● USB connected · AI agent ready",
+                       "● USB connected · waiting for agent", "● Plug in a USB data cable"]),
+    (400, "sans", 22, ["The connection dropped.", "Check Wi-Fi and try again.", "Restarting into your app…"]),
+    (330, "sans", 22, ["Set · ends in 4c8e", "Not set", "Not connected", "Vibe Mode 0.3.0 · 24 apps",
+                       "24 apps · 312.4 MB used", "Connect Wi-Fi first", "192.168.100.200:7777"]),
+    (360, "medium", 22, ["NETWORKS · 16", "SCANNING…", "PICK ONE TO CONTINUE"]),
+    (252, "sans", 22, ["Connected", "Connecting…", "Choose a network", "Not connected"]),
 ]
 
 
@@ -1307,13 +1294,13 @@ def check_copy() -> list[str]:
 
 
 def check_store_text() -> list[str]:
-    """Sample store summaries fit the detail page untruncated (ASCII, <= 120 chars, 4 lines)."""
+    """Sample store summaries fit the About page untruncated (ASCII, <= 120 chars)."""
     problems = []
     for app in PRESETS + STORE_ONLY:
         if len(app["summary"]) > 120 or not app["summary"].isascii():
             problems.append(f"summary of {app['id']} must be ASCII and <= 120 characters")
-        if wrap_lines(app["summary"], "sans", 15, 267, 4)[1]:
-            problems.append(f"summary of {app['id']} needs more than 4 lines at 267 px")
+        if wrap_lines(app["summary"], "sans", 26, SUMMARY_W, SUMMARY_LINES)[1]:
+            problems.append(f"summary of {app['id']} needs more than {SUMMARY_LINES} lines")
     return problems
 
 
@@ -1330,8 +1317,9 @@ def unused_icons(states, extras, templates) -> list[str]:
     for objs in templates.values():
         walk(objs)
     # Images the keyboard and the prototype swap in at runtime.
-    used |= {"back-22-white.png", "backspace-26-white.png", "battery_full-22-white.png",
-             "battery_charging-22-white.png", "eye_off-24-white.png"}
+    used |= {"back-28-white.png", "backspace-28-white.png", "battery_full-28-white.png",
+             "battery_charging-28-white.png", "eye_off-32-white.png", "wifi_off-28-grey.png",
+             "robot-28-grey.png", "star_fill-32-orange.png", "trash-32-white.png"}
     return sorted(p.name for p in (DESIGN / "assets/icons").glob("*.png") if p.name not in used)
 
 
@@ -1404,7 +1392,7 @@ def main() -> int:
                             "row_heights": {"apps": APP_ITEM_H, "networks": NET_ITEM_H},
                             "categories": [{"id": k, "label": t, "icon": i} for k, t, i in CATEGORIES],
                             "apps": PRESETS, "store_only": STORE_ONLY, "store_updates": STORE_UPDATES,
-                            "favorites": FAVORITES, "current": CURRENT, "filter_titles": FILTER_TITLES,
+                            "favorites": FAVORITES, "current": CURRENT, "filter_labels": FILTER_LABELS,
                             "empty_copy": EMPTY_COPY, "qr_urls": QR_URLS, "wifi_link_token": TOKEN,
                             "ai_token": AI_TOKEN}}
     (DESIGN / "layout.json").write_text(json.dumps(layout, indent=1, ensure_ascii=False) + "\n",

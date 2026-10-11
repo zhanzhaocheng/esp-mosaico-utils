@@ -354,6 +354,13 @@ ICONS = {
     "audio": _speaker,
     "chat": lambda p: (p.rrect(3.5, 4.5, 20.5, 15.8, 3.4, 1.8), p.line([(8.4, 15.8), (6.6, 20.4), (12.6, 15.8)], 1.8)),
     "motor": _gear,
+    "qr": lambda p: (*[p.rrect(x, y, x + 6.5, y + 6.5, 1.2, 1.7) for x, y in ((3.5, 3.5), (14, 3.5), (3.5, 14))],
+                     p.rrect(15.5, 15.5, 17.5, 17.5, 0.4, None), p.rrect(18.5, 18.5, 20.5, 20.5, 0.4, None),
+                     p.rrect(18.5, 14, 20.5, 16, 0.4, None), p.rrect(14, 18.5, 16, 20.5, 0.4, None)),
+    "info": lambda p: (p.circle(12, 12, 9, 1.8), p.line([(12, 11), (12, 17)], 2.0), p.dot(12, 7.6, 1.3)),
+    "share": lambda p: (p.line([(12, 15), (12, 3.8)], 2.0), p.line([(7.2, 8.4), (12, 3.6), (16.8, 8.4)], 2.0),
+                        p.line([(4.5, 13.5), (4.5, 20), (19.5, 20), (19.5, 13.5)], 2.0)),
+    "chevron_down": lambda p: p.line([(5.5, 9), (12, 15.5), (18.5, 9)], 2.2),
     "expand": lambda p: (p.line([(4, 9), (4, 4), (9, 4)], 1.9), p.line([(15, 4), (20, 4), (20, 9)], 1.9),
                          p.line([(4, 15), (4, 20), (9, 20)], 1.9), p.line([(20, 15), (20, 20), (15, 20)], 1.9)),
     "chip": lambda p: (p.rrect(6, 6, 18, 18, 2.5), p.rrect(9.5, 9.5, 14.5, 14.5, 1.0),
@@ -395,25 +402,20 @@ def _empty_grid(size: int, color) -> Image.Image:
 
 # (icon, size px, color name). Sizes match their on-screen boxes exactly.
 ICON_OUTPUTS = [
-    # Headers, status row and navigation.
-    ("back", 22, "white"), ("help", 22, "white"), ("settings", 22, "white"), ("chevron", 18, "dim"),
-    ("wifi", 22, "white"), ("wifi_off", 22, "grey"), ("robot", 22, "orange"), ("robot", 22, "grey"),
-    ("battery_full", 22, "white"), ("battery_mid", 22, "white"), ("battery_low", 22, "orange"),
-    ("battery_charging", 22, "white"),
-    # Library filters, rows and favorites.
-    ("star", 18, "white"), ("star_fill", 18, "black"), ("grid", 18, "white"), ("grid", 18, "black"),
-    ("star", 22, "white"),
-    ("star_fill", 22, "orange"), ("grid", 22, "white"),
-    *[(name, 22, "white") for name in ("display", "audio", "house", "sensor", "chat", "motor")],
-    # Actions.
-    ("download", 20, "black"), ("download", 20, "white"), ("code", 20, "white"), ("play", 20, "black"),
-    ("refresh", 20, "white"), ("trash", 20, "orange"), ("replay", 20, "white"), ("backspace", 26, "white"),
-    ("arrow", 26, "white"), ("expand", 16, "grey"), ("eye", 24, "white"), ("eye_off", 24, "white"),
-    # Pages: develop, device, help, guide, progress and results.
-    ("usb", 22, "grey"), ("wifi", 22, "grey"), ("pin", 22, "grey"), ("key", 22, "grey"),
-    ("chip", 22, "grey"), ("id", 22, "grey"), ("storage", 22, "grey"), ("flag", 24, "white"),
-    ("code", 24, "white"), ("hash", 24, "white"), ("support", 24, "white"), ("download", 24, "white"),
-    ("power", 20, "orange"), ("check", 40, "orange"), ("close", 40, "grey"),
+    # 28 px: status strip, list chevrons, keyboard function keys, inline hints.
+    ("chevron", 28, "dim"), ("chevron_down", 28, "white"), ("wifi", 28, "white"), ("wifi_off", 28, "grey"),
+    ("robot", 28, "orange"), ("robot", 28, "grey"), ("battery_full", 28, "white"), ("battery_mid", 28, "white"),
+    ("battery_low", 28, "orange"), ("battery_charging", 28, "white"), ("expand", 28, "grey"),
+    ("power", 28, "orange"), ("back", 28, "white"), ("backspace", 28, "white"),
+    # 32 px: every icon inside a button or a row.
+    *[(name, 32, "white") for name in ("back", "help", "settings", "star", "qr", "replay", "refresh", "download",
+                                       "code", "share", "usb", "trash", "info", "close", "backspace", "arrow",
+                                       "eye", "eye_off", "grid", "display", "audio", "house", "sensor", "chat",
+                                       "motor", "flag", "hash", "support")],
+    ("star_fill", 32, "orange"), ("download", 32, "black"), ("play", 32, "black"), ("trash", 32, "orange"),
+    *[(name, 32, "grey") for name in ("wifi", "pin", "key", "chip", "id", "storage")],
+    # 48 px: result ring.
+    ("check", 48, "orange"), ("close", 48, "grey"),
 ]
 COLORS = {"white": WHITE, "grey": GREY, "dim": DIM, "black": BLACK, "orange": ORANGE}
 
