@@ -1,12 +1,13 @@
-#include "esp_attr.h"
 // SPDX-License-Identifier: Apache-2.0
+#include "esp_attr.h"
 #include "factory_ui.h"
 #include "factory_ui_dispatch.h"
 #include "factory_ui_input.h"
 #include "vibe_ui.h"
 #include "board_display.h"
 #include "vibe_bundle.h"
-#include "esp_gsp_esp_lcd.h"
+#include "vibe_scene.h"
+#include "vibe_view_esp.h"
 #include "esp_check.h"
 #include "esp_iris.h"
 #include "esp_wifi.h"
@@ -180,24 +181,25 @@ static void service_snapshot(void *ctx, vibe_snapshot_t *out)
     COPY(update_owner, system.owner == FACTORY_SYSTEM_UPDATE_OWNER_NAND ? "NAND" : system.owner == FACTORY_SYSTEM_UPDATE_OWNER_BRIDGE ? "Bridge" : out->usb_owner ? "USB" : "TCP");
     COPY(update_verified, "Unsigned");
 }
-esp_gsp_handle_t factory_ui_handle(void) { return s_ui.ui; }
+vv_view_t *factory_ui_handle(void) { return s_ui.ui; }
 esp_err_t factory_ui_start(void)
 {
-    esp_display_present_target_config_t display;
+    vv_esp_config_t display;
     ESP_RETURN_ON_ERROR(board_display_init(&display), TAG, "display");
     esp_lcd_touch_handle_t touch = NULL;
     ESP_RETURN_ON_ERROR(board_touch_init(&touch), TAG, "touch");
+    display.touch_read = touch ? board_touch_read : NULL;
+    display.touch_ctx = touch;
     ESP_RETURN_ON_ERROR(iris_screen_mirror_init(), TAG, "screen backend");
-    esp_gsp_config_t config;
-    ESP_RETURN_ON_ERROR(vibe_bundle_open(&config), TAG, "embedded GSP bundle");
-    esp_gsp_esp_lcd_config_t lcd = ESP_GSP_ESP_LCD_CONFIG_INIT();
-    lcd.display = display; lcd.touch = touch;
-    esp_gsp_handle_t ui;
-    ESP_RETURN_ON_ERROR(esp_gsp_esp_lcd_start(&config, &lcd, &ui), TAG, "GSP start");
+    const void *assets = NULL;
+    size_t assets_size = 0;
+    ESP_RETURN_ON_ERROR(vibe_bundle_open(&assets, &assets_size), TAG, "embedded UI assets");
+    vv_view_t *ui = NULL;
+    ESP_RETURN_ON_ERROR(vv_esp_start(&display, &vibe_scene, assets, assets_size, &ui), TAG, "view start");
     ESP_RETURN_ON_ERROR(iris_screen_mirror_attach(ui), TAG, "screen attach");
     const vibe_services_t services = {.snapshot = service_snapshot, .command = service_command};
     ESP_RETURN_ON_ERROR(factory_ui_dispatch_start(ui, &s_ui, &services), TAG, "Vibe UI");
-    ESP_LOGI(TAG, "Vibe Mode GSP UI ready at 480x480");
+    ESP_LOGI(TAG, "Vibe Mode UI ready at %ux%u", (unsigned)vv_width(ui), (unsigned)vv_height(ui));
     return ESP_OK;
 }
 esp_err_t factory_ui_open_bridge(void)

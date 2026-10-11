@@ -47,15 +47,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Set up GSP bootstrap Python
+      - name: Set up Recovery build Python
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Prepare pinned GSP host dependencies
+      - name: Prepare Recovery build tools
+        shell: bash
+        # zopfli requires Python 3.10+, while host tests also run on 3.8.
         run: |
-          python -m pip install --disable-pip-version-check esp-gsp-tools==0.1.1
           python -m pip install --disable-pip-version-check -r esp-mosaico-recovery/firmware/recovery/tools/requirements.txt
-          python tools/ci/prepare_gsp.py
+          echo "RECOVERY_BUILD_PYTHON=$(python -c 'import sys; print(sys.executable)')" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v7
         with:
@@ -290,11 +291,6 @@ jobs:
             sudo apt-get install --yes ccache
           fi
           ccache --version
-      - name: Prepare pinned Recovery GSP compiler
-        run: |
-          python -m pip install --disable-pip-version-check esp-gsp-tools==0.1.1
-          python tools/ci/prepare_gsp.py --compiler-only
-
       - name: Build firmware (${{ matrix.group }})
         shell: bash
         run: |
@@ -314,6 +310,9 @@ jobs:
             ESP-Iris/budget-results.json
             build-ci-recovery-factory/*.bin
             build-ci-recovery-factory/*.elf
+            build-ci-recovery-factory/*.map
+            build-ci-recovery-factory/size*.txt
+            build-ci-recovery-factory/size-components.json
             build-ci-recovery-factory/sdkconfig
           if-no-files-found: warn
           retention-days: 14

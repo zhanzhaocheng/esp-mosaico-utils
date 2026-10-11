@@ -1,21 +1,21 @@
 #include "sdk.h"
 #include SOURCE
 
-static mock_gsp_callback_t timer_callback;
+static vv_timer_cb_t timer_callback;
 static void *timer_context;
 static bool fail_timer;
-static esp_err_t init_result, open_result;
+static vv_err_t init_result;
+static esp_err_t open_result;
 static unsigned opens;
 static vibe_ui_t state;
 static const vibe_services_t services;
 
-void *esp_gsp_timer_create(esp_gsp_handle_t ui, unsigned period,
-                           mock_gsp_callback_t callback, void *ctx)
+void *vv_timer_create(vv_view_t *ui, uint32_t period, vv_timer_cb_t callback, void *ctx)
 {
     if (fail_timer) return NULL;
     timer_callback = callback; timer_context = ctx; return (void *)1;
 }
-esp_gsp_err_t vibe_ui_init(vibe_ui_t *s, esp_gsp_handle_t ui, const vibe_services_t *svc)
+vv_err_t vibe_ui_init(vibe_ui_t *s, vv_view_t *ui, const vibe_services_t *svc)
 {
     assert(s == &state && svc != &services); /* Caller storage is copied. */
     return init_result;
@@ -31,7 +31,7 @@ static void reset(void)
     s_initialized = s_call_lock = NULL;
     s_requests = s_responses = NULL;
     s_state = NULL; s_init_attempted = false; atomic_store(&s_ready, false);
-    mock_wait = NULL; opens = 0; init_result = open_result = ESP_OK;
+    mock_wait = NULL; opens = 0; init_result = VV_OK; open_result = ESP_OK;
     assert(mock_allocations == 0);
 }
 int main(void)
@@ -84,7 +84,7 @@ int main(void)
     reset();
 
     /* Failed initialization never accepts requests that cannot be serviced. */
-    init_result = ESP_ERR_NO_MEM; mock_wait = render;
+    init_result = VV_ERR_NO_MEM; mock_wait = render;
     assert(factory_ui_dispatch_start((void *)1, &state, &services) == ESP_ERR_NO_MEM);
     assert(factory_ui_dispatch_open_bridge() == ESP_ERR_INVALID_STATE);
     reset();

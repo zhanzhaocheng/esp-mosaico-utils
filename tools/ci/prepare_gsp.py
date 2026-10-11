@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Prepare pinned Recovery GSP dependencies without an ESP-IDF build.
+"""Prepare the GSP 1.4.0 tools once pinned by Recovery, without an ESP-IDF build.
 
-Run with Python 3.10+ and esp-gsp-tools==0.1.1 installed. The host test
-interpreter can subsequently switch to Python 3.8; the native build keeps
-using this bootstrap interpreter. Both utilities and workspace CI use this.
+Recovery now renders with Vibe View and no longer needs GSP: this repository's
+CI stopped calling the script. It remains so consuming workspaces that still
+run it keep working until they drop the step.
+
+Run with Python 3.10+ and esp-gsp-tools==0.1.1 installed.
 """
 import argparse
 import hashlib

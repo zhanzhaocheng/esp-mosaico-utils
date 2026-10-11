@@ -19,27 +19,33 @@
 #define IRIS_MAX_TASK_MEMORY_RECORDS 128U
 #define IRIS_WORKER_RUN_BUDGET_US (20LL * 1000LL)
 
-iris_runtime_t g_iris = {
-    .transport = {
-        .tcp = {
-            .listen_fd = -1,
-            .client_fd = -1,
-        },
-    },
-    .log_lock = portMUX_INITIALIZER_UNLOCKED,
-    .event_lock = portMUX_INITIALIZER_UNLOCKED,
-    .lifecycle = ESP_IRIS_LIFECYCLE_STOPPED,
-    .task_stack_free_min_bytes = UINT32_MAX,
-};
-
+/* Each runtime embeds its wire frames. A static initializer would store the
+ * whole structure, mostly zeros, in the application image, so keep the
+ * runtimes in .bss and set their few non-zero defaults before app_main. */
+iris_runtime_t g_iris;
 #if CONFIG_ESP_IRIS_DATA_LINK
-iris_runtime_t g_iris_data = {
-    .data_link = true,
-    .transport.tcp = {.listen_fd = -1, .client_fd = -1},
-    .log_lock = portMUX_INITIALIZER_UNLOCKED,
-    .event_lock = portMUX_INITIALIZER_UNLOCKED,
-};
+iris_runtime_t g_iris_data;
 #endif
+
+static void iris_runtime_defaults(iris_runtime_t *runtime, bool data_link)
+{
+    static const portMUX_TYPE unlocked = portMUX_INITIALIZER_UNLOCKED;
+    runtime->data_link = data_link;
+    runtime->transport.tcp.listen_fd = -1;
+    runtime->transport.tcp.client_fd = -1;
+    runtime->log_lock = unlocked;
+    runtime->event_lock = unlocked;
+}
+
+__attribute__((constructor)) static void iris_runtime_static_init(void)
+{
+    iris_runtime_defaults(&g_iris, false);
+    g_iris.lifecycle = ESP_IRIS_LIFECYCLE_STOPPED;
+    g_iris.task_stack_free_min_bytes = UINT32_MAX;
+#if CONFIG_ESP_IRIS_DATA_LINK
+    iris_runtime_defaults(&g_iris_data, true);
+#endif
+}
 
 iris_runtime_t *iris_peer_runtime(const iris_runtime_t *runtime)
 {

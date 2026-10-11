@@ -1,7 +1,8 @@
 CONFIG_IDF_TARGET="esp32s31"
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 
-# GSP 1.4 creates and validates the UI on app_main before its render task starts.
+# Vibe View builds the UI on its own task. Keep the measured 0.2 main-task
+# budget until the startup headroom log is re-measured on a device.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=20480
 
 # Recovery retains every transport and update backend; optimize the same code
@@ -33,7 +34,7 @@ CONFIG_TINYUSB_CDC_RX_BUFSIZE=8192
 CONFIG_TINYUSB_CDC_TX_BUFSIZE=8192
 CONFIG_TINYUSB_CDC_EP_BUFSIZE=8192
 
-# GSP owns the raw CO5300 panel, touch and PSRAM frame buffers.
+# Vibe View owns the raw CO5300 panel, touch and PSRAM frame buffer.
 CONFIG_BSP_DISPLAY_ENABLE=y
 # CONFIG_BSP_DISPLAY_LVGL_ENABLE is not set
 CONFIG_BSP_CO5300_ENABLE_TE=y
@@ -48,9 +49,23 @@ CONFIG_SPIRAM_MEMTEST=n
 # CONFIG_ESP_WIFI_SOFTAP_SUPPORT is not set
 # CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT is not set
 CONFIG_MBEDTLS_TLS_CLIENT_ONLY=y
-
-# Fixed GSPC assets need no runtime JPEG decoder. Use the GSP 1.4 link option.
-# CONFIG_ESP_GSP_ENABLE_JPEG is not set
+# Without an AP there is no DHCP server. Discovery, pairing and the Bridge use
+# IPv4 only: the Vibe Mode screens publish an IPv4 endpoint.
+# CONFIG_LWIP_DHCPS is not set
+# CONFIG_LWIP_IPV6 is not set
+# Trust anchors come from the DER certificate bundle and the client presents no
+# certificate, so PEM, CRL, CSR and PKCS#7 parsing and renegotiation are unused.
+# CONFIG_MBEDTLS_PEM_PARSE_C is not set
+# CONFIG_MBEDTLS_PEM_WRITE_C is not set
+# CONFIG_MBEDTLS_X509_CRL_PARSE_C is not set
+# CONFIG_MBEDTLS_X509_CSR_PARSE_C is not set
+# CONFIG_MBEDTLS_PKCS7_C is not set
+# CONFIG_MBEDTLS_SSL_RENEGOTIATION is not set
+# Keep NIST P-256/384/521 (TLS and WPA3-Personal SAE groups 19-21) and X25519.
+# CONFIG_MBEDTLS_ECP_DP_SECP256K1_ENABLED is not set
+# CONFIG_MBEDTLS_ECP_DP_BP256R1_ENABLED is not set
+# CONFIG_MBEDTLS_ECP_DP_BP384R1_ENABLED is not set
+# CONFIG_MBEDTLS_ECP_DP_BP512R1_ENABLED is not set
 
 CONFIG_TINYUSB_CDC_COUNT=2
 

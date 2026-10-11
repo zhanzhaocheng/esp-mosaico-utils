@@ -29,6 +29,17 @@ static atomic_bool s_ready;
 static esp_err_t s_init_result;
 static uint32_t s_next_request;
 
+static esp_err_t view_error(vv_err_t err)
+{
+    switch (err) {
+    case VV_OK: return ESP_OK;
+    case VV_ERR_NO_MEM: return ESP_ERR_NO_MEM;
+    case VV_ERR_INVALID_ARG: return ESP_ERR_INVALID_ARG;
+    case VV_ERR_NOT_FOUND: return ESP_ERR_NOT_FOUND;
+    default: return ESP_ERR_INVALID_STATE;
+    }
+}
+
 static TickType_t remaining_ticks(int64_t deadline)
 {
     const int64_t remaining = deadline - esp_timer_get_time();
@@ -37,12 +48,12 @@ static TickType_t remaining_ticks(int64_t deadline)
     return ticks > 0 ? ticks : 1;
 }
 
-static void process_commands(esp_gsp_handle_t ui, void *ctx)
+static void process_commands(vv_view_t *ui, void *ctx)
 {
     (void)ctx;
     if (!s_init_attempted) {
         s_init_attempted = true;
-        s_init_result = vibe_ui_init(s_state, ui, &s_services);
+        s_init_result = view_error(vibe_ui_init(s_state, ui, &s_services));
         atomic_store(&s_ready, s_init_result == ESP_OK);
         xSemaphoreGive(s_initialized);
     }
@@ -60,7 +71,7 @@ static void process_commands(esp_gsp_handle_t ui, void *ctx)
     }
 }
 
-esp_err_t factory_ui_dispatch_start(esp_gsp_handle_t ui, vibe_ui_t *state,
+esp_err_t factory_ui_dispatch_start(vv_view_t *ui, vibe_ui_t *state,
                                     const vibe_services_t *services)
 {
     if (s_state != NULL) return ESP_ERR_INVALID_STATE;
@@ -71,7 +82,7 @@ esp_err_t factory_ui_dispatch_start(esp_gsp_handle_t ui, vibe_ui_t *state,
     if (!s_initialized || !s_call_lock || !s_requests || !s_responses) goto fail;
     s_state = state;
     s_services = *services;
-    if (!esp_gsp_timer_create(ui, 50, process_commands, NULL)) goto fail;
+    if (!vv_timer_create(ui, 50, process_commands, NULL)) goto fail;
     /* Once registered, the callback owns these resources, including after a
      * timeout. It may complete later without accessing a caller's stack. */
     if (xSemaphoreTake(s_initialized, pdMS_TO_TICKS(UI_START_TIMEOUT_MS)) != pdTRUE)
@@ -95,7 +106,7 @@ esp_err_t factory_ui_dispatch_open_bridge(void)
     if (xSemaphoreTake(s_call_lock, remaining_ticks(deadline)) != pdTRUE)
         return ESP_ERR_TIMEOUT;
     const ui_request_t request = {.id = ++s_next_request, .deadline = deadline};
-    /* Replace a request that expired while the render task was stalled. */
+    /* Replace a request that expired while the UI task was stalled. */
     xQueueOverwrite(s_requests, &request);
     esp_err_t result = ESP_ERR_TIMEOUT;
     ui_response_t response;

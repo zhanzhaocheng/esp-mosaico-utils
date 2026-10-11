@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Replace ESP-GSP in Vibe Mode with Vibe View, a fixed-scene C renderer in
+  `firmware/recovery/components/vibe_view`. `ui/main.json` stays the layout
+  source; `tools/gen_vibe_view.py` commits scene tables and pre-rendered 4-bit
+  glyphs under `ui/generated`. The ESP-IDF port renders into a PSRAM frame,
+  sends changed areas after the CO5300 TE pulse and serves Iris screenshots
+  from that frame. The GSP runtime (about 395 KiB of code and constants in
+  `factory.bin` 0.2.0), esp_display_present and the 43 KiB GSPB are no longer
+  linked; compressed UI assets are about 19 KiB. The keyboard gains a second
+  symbol page covering all printable ASCII. Host UI tests use a native
+  simulator with simulated time instead of the GSP simulator and compiler.
+  Device build, size measurement and acceptance remain to be done before the
+  prebuilt bundle may change.
+
 - Raise Recovery to `0.1.4` on the merged `0.1.3` baseline. Bootstrap the pinned
   standalone GSP compiler before ESP-IDF configures Recovery, and retain the
   eight-component / 3 KiB manifest limits and immutable Recovery layout.

@@ -5,7 +5,6 @@
 #include "esp_iris.h"
 #include "esp_iris_service_profiles.h"
 #include "factory_ui.h"
-#include "esp_gsp_debug.h"
 
 /* Same 12-byte little-endian pointer contract as the Gateway input adapter. */
 #define POINTER_SERVICE_ID ESP_IRIS_POINTER_SERVICE_ID
@@ -37,8 +36,8 @@ static esp_err_t pointer_rpc(const esp_iris_rpc_request_t *request,
         x < 0 || x >= BSP_LCD_H_RES || y < 0 || y >= BSP_LCD_V_RES) {
         return ESP_ERR_INVALID_ARG;
     }
-    err = esp_gsp_inject_touch(factory_ui_handle(), x, y, message[0] != 2);
-    if (err != ESP_OK) return err;
+    const vv_err_t injected = vv_inject_touch(factory_ui_handle(), x, y, message[0] != 2);
+    if (injected != VV_OK) return injected == VV_ERR_NO_MEM ? ESP_ERR_NO_MEM : ESP_ERR_INVALID_STATE;
     memcpy(response, message, POINTER_MESSAGE_SIZE);
     *response_size = POINTER_MESSAGE_SIZE;
     return ESP_OK;

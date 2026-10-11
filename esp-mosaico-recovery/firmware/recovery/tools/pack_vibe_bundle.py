@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Losslessly compress the embedded GSPB for the immutable Recovery slot."""
+"""Losslessly compress the embedded Vibe View assets for the immutable Recovery slot."""
 from pathlib import Path
 import argparse
 import zlib
@@ -13,12 +13,12 @@ except ImportError as error:
 
 def pack(source, output):
     raw = Path(source).read_bytes()
-    # Font bitmaps and scene records benefit from different Deflate match
+    # Font bitmaps and images benefit from different Deflate match
     # heuristics. Keep the default stream as a candidate so this optimization
     # never grows the bundle. All candidates use the same zlib format accepted
     # by the device's ROM tinfl decoder; no new runtime codec is required.
     # Spend a few seconds on the host to save Flash without changing the ROM
-    # decoder or a single decompressed scene/font byte.
+    # decoder or a single decompressed font or image byte.
     candidates = [zlib.compress(raw, 9),
                   zopfli.zlib.compress(raw, numiterations=200)]
     for memory in (6, 7, 8, 9):
