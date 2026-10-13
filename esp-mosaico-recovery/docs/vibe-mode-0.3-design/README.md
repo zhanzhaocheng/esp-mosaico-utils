@@ -1,232 +1,211 @@
-# Vibe Mode 0.3 界面设计与功能定义（阶段 A · 第 6 版）
+# Vibe Mode 0.3 界面设计与功能定义（阶段 A · 第 10 版）
 
 | 项目 | 内容 |
 | --- | --- |
-| 状态 | v6 设计与可交互原型已实现；本目录只包含设计工具和生成物，**不修改固件** |
-| 范围 | 480×480 Vibe Mode 信息架构、页面、交互、状态、商店接口输入与阶段 B handoff |
-| 语言 | 本轮为英文；Noto Sans SC 子集保留给后续中文阶段 |
-| 页面图 | `mockups/`：66 个页面状态，由 `layout.json`（schema `vibe-mode-design/6`）渲染，带 60 px 屏幕圆角遮罩 |
-| 原型 | `prototype/index.html`：单文件离线原型，与页面图共用 `layout.json`；右侧有测试清单和模拟开关 |
-| 验证 | `build_design.py --strict`：0 layout issues；Playwright smoke：66 passed, 0 failed |
+| 状态 | v10 已实现；本目录只包含设计工具和生成物，**不修改固件** |
+| 范围 | 480×480 Vibe Mode：首页、Idea 横向分页、Manage / Idea info / Download / Develop / Settings / Shared info |
+| 语言 | 英文 UI；命名统一为 **Idea** |
+| 页面图 | `mockups/`：69 个页面状态，由 `layout.json`（schema `vibe-mode-design/10`）渲染，带 60 px 屏幕圆角遮罩 |
+| 原型 | `prototype/index.html`：单文件离线原型，横向翻页 + 子页栈 + 打开确认 + 左滑删除 / Undo + 长按删除 + 触感 + 息屏 + IMU 旋转 + Boot 键 + NVS 面板 |
+| 验证 | `build_design.py --strict`：0 layout issues；Playwright smoke：153 passed, 0 failed |
 
 ![全部页面](mockups/00-overview.png)
 
-## 1. v6 修订
+## 1. v10 修订：系统行为
 
-### 修掉的细节问题
+### IMU 自动旋转
 
-- **缺字**：Archivo / Inter 子集没有 `→ ← ✓ ● ○ ★ ☆`，v5 的部分文案会显示成方框。v6 全部改成图标或现有字符（`· • … ↑ ↓ ×`），并新增“字形覆盖”严格检查（按字体 cmap 校验每一段文案）。
-- **Inter 文字偏上**：子集字体的 ascent/descent 按 1000 upm 写入，但 Inter 是 2048 upm。`generate_assets.py::_metrics()` 现按 `unitsPerEm` 换算，正文垂直居中恢复正常。
-- **首页**：去掉像上标的计数；收藏星改为灰色；当前应用与“↑ Update available”用橙色第二行表达，不再叠圆点和箭头。
-- **详情**：去掉与主按钮冲突的页码圆点；第 1 屏底部用 “About this app ⌄” 提示第 2 屏。
-- **下载报错**：ID 卡片加高到 68 px，数字缩小一档后在下方显示错误原因。
-- **进度**：0% 不再画出一个点；下载/更新有 Cancel，安装中不可取消（按 AI 会提示原因）。
-- **分类“Communication”** 在 136 px 图块里放不下，改为 `Chat`。
+界面是正方形，旋转时不重新排版，只转方向：
 
-### 图形
+- **屏幕方向**：QSPI 屏通过 MADCTL 的 MV/MX/MY 位（`esp_lcd_panel_swap_xy` / `mirror`）直接旋转扫描方向，触摸坐标做同样的变换，整帧重绘，并用 120 ms 淡入淡出遮住撕裂。
+- **方向判断**：按 IMU 的重力方向分 0° / 90° / 180° / 270° 四档。偏离当前方向超过 60° 才切换，另有 15° 回差，并且要保持 300 ms；设备平放时（|z| > 0.8 g）不切换。
+- **暂不旋转的时机**：手指按着屏幕、正在键盘页输入、正在长按 3 秒时；离开这些状态后再转。
+- **开关**：Settings → Display → **Auto-rotate**，关闭后界面跟着设备一起转。
 
-- 点阵图形全部重画为 7×7 网格（白色 + 橙色强调 + 暗格），4× 超采样后缩小：分类图块（56/96/120）、Guide/结果主视觉（120）和空状态（80）。Sensors 改为仪表、Wi‑Fi 改为扇形，小尺寸下也能辨认。
-- 文字旁线性图标统一 20 px；页头/卡片 32 px；状态栏 28 px。新增 `clock`、`lock`。
-- 加载动画为 8 帧点阵环（`assets/anim/spin32-*`、`spin64-*`）。
+参数见 `tokens.orientation`。
 
-### 页面与交互
+### AI 键按下反馈（类似 iPhone 侧键）
 
-- **Browse 底部面板**：点首页 `My apps ⌄` 从下方滑出 3×3 图块（All / Recent / Favorites + 6 个分类，带数量）；点上方空白或下拉关闭。
-- **Updates / Storage 行级操作**：Updates 每行可点进详情；`Update all` 在后台逐个更新，首页状态栏显示 `↓ k/n`，断网暂停、联网继续。Storage 按大小排序，点一行直接进入该应用的 About 页删除。
-- **Wi‑Fi 当前网络页**：显示信号、加密方式、IP，底部 `Hold to forget`。
-- **离线续接**：查询 ID、更新、开启 Mosaico AI、批量更新在离线时都会进入 Wi‑Fi 页并显示要继续的任务；连上后自动继续，离开 Wi‑Fi 页即取消。
-- **Guide 5 步**：顶部进度点 + Skip；最后一步 `Later` / `Connect`，Connect 直接进入 Wi‑Fi。
-- **启动提示**：有更新时顶部横幅 `2 updates · tap to see`，点按进入 Updates。
+- 按下瞬间：屏幕上沿、AI 键正下方长出一条 64×8 的橙色短条，同时触感一下。
+- 松开后：短条下方弹出一个小标签，写明这次按键做了什么——`Back`（返回）/ `Home`（回首页）/ `Lock`（息屏）/ `Close`（关闭弹窗）/ `Wake`（唤醒）。停留 0.5 s 后淡出。
+- 反馈固定在**设备边缘、按键下方**，不跟着界面转；界面旋转后，标签会反向旋转保持可读。
 
-### 新增严格检查
+参数见 `tokens.key_feedback`。
 
-字形覆盖、顶层按钮触控区重叠（最后一个 scrim 之上；列表裁切行除外）、危险按钮与其他按钮间距 ≥24 px、引用的图片必须存在、商店简介在 Inter 18 / 432 px 下 ≤3 行。底部面板（role `sheet`）不参与圆角和越界检查。
+### 息屏锁屏
 
-## 2. 480×480 设计系统
+- **进入方式**：在首页按 AI 键；或者无操作超过设定时间。时间在 Settings → Display 里选，可选 1 / 3 / 5 / 10 分钟或 Never，默认 3 分钟。
+- **息屏时**：Wi‑Fi 断开，背光降到 10 %，屏幕只显示一帧静态画面：点阵图形 + **Make Ideas Run** + `Vibe Mode v1.2` + `Tap or pick up to wake`。
+- **唤醒**：点屏幕、IMU 检测到移动、或按任意键。唤醒后回到原来的页面，Wi‑Fi 自动重连。
+- **不会息屏的时候**：正在下载 / 安装 / 切换、后台更新进行中、Idea 正在运行。
 
-### 物理与几何
+参数见 `tokens.screen_off`。Settings 现在有 5 行（多了 Display），所以改为可滚动列表。
 
-| 项目 | v6 值 |
+### Boot 键
+
+- **按住底部左侧的 Boot 键（0.6 s）**：打开 *Update Vibe Mode* 说明页。页面写明只有安装新的 Vibe Mode 版本时才需要 Boot 键，用 `Hold Boot` + `Press power twice` 两个标签说明怎么进入更新模式，并附二维码（`mosaico.espressif.com/vibe/update`）去网页看详细步骤。点 `Got it` 或按 AI 关闭。
+- **按住 Boot 再双击开关机键**：进入 *Update mode* 页（二维码 + 网址）。这个页面不在 Vibe Mode 的页面栈里，AI 键无效；按一次开关机键重启回到 Vibe Mode。
+
+### 完成时的震动
+
+下载完成、更新完成、存入 NAND 完成、切换 Idea 写入完成、Agent 安装完成时，都给一次“成功”震动：14 ms → 隔 70 ms → 22 ms。下载失败给两下 40 ms。参数见 `tokens.haptics.success` / `error`。
+
+## 2. v9 修订
+
+### 首页与翻页
+
+| 项 | 做法 |
 | --- | --- |
-| 屏幕 | 480×480，显示宽 38.8 mm |
-| 像素尺寸 | `PX_MM = 38.8 / 480 = 0.0808 mm` |
-| 屏幕圆角 | `SCREEN_R = 60` |
-| 页面外边距 | 常规 16 px；危险操作左右/底边至少 24 px |
-| 列表行 | 72 px 内容 + 8 px 间隔（80 px 节距） |
-| 卡片圆角 | 18–20 px |
-| 页面动效 | 48 px 位移，260 ms，`cubic-bezier(.32,.72,0,1)`；底部面板 300 ms |
+| 升级标识 | 首页状态栏不再显示 “↑ 2 updates”；更新只在 Idea 图标角标和 Manage 里出现 |
+| 翻页 | 只有内容左右移动，**状态栏和底部圆点固定不动**；落到新页后状态栏中间显示 `Home` / `Ideas 2/4`，2 秒后消失 |
+| 首次提示 | 首次使用时首页右边缘有一个朝左的橙色三角，循环做“左移 + 轻晃”；用户第一次翻页后永久消失（`vibe_prefs/pager_hint`）。三角放在右边缘、指向左，因为首页左边没有页面，下一页在右边、要向左滑 |
+| 添加 Idea | Ideas 最后一格是石墨色圆 + 大号白色 `+`；点按进入 Manage 里的 Download Idea，返回回到 Manage |
 
-### 字号
+### 打开 Idea 前确认
 
-| 语义键 | 字体 | 允许字号 |
+点 Idea 不再直接进入，先弹出确认框：
+
+- 标题 `Open <Idea>?`，副标题说明 Vibe Mode 会关闭；如果正在运行的是还没存到 NAND 的开发版，改为橙色提醒 `Unsaved hello_world will be replaced.`
+- “To come back to Vibe Mode” 区块：`Hold AI` + `Press power twice` 两个按键标签。
+- `Cancel` / `Open`；AI 键也能关闭。
+- 底部 `Don't show this again` 勾选框；勾选后点 Open，之后点 Idea 直接进入（`vibe_prefs/open_confirm`）。
+
+### 删除
+
+| 位置 | 做法 |
+| --- | --- |
+| Idea info | **长按 3 秒**删除。按下后 Open 缩成只剩图标，Delete 变宽，按钮里的红色进度条随时间填满，文字倒数 `Keep holding · 2 s`；上方内容变暗并弹出 `Delete <Idea>? Keep holding for 3 s. Let go to cancel.` 中途松手：恢复原样并提示 `Not deleted`。只点一下：提示 `Hold for 3 s to delete` |
+| Manage / Shared 列表 | 行左滑露出 Delete，点按删除，4 秒内可 Undo（不变） |
+| 忘记 Wi‑Fi | 同样长按 3 秒 |
+
+删除相关统一用红色 `#E5484D`（Delete、进度、忘记网络），橙色只表示“需要注意”。
+
+### Manage 与 Develop
+
+- Manage 的更新按钮图标改为**向上箭头 + 底线**（upgrade），不再用刷新图标；Idea info 的 “Update to v…” 行同步使用。
+- Develop 第三行从 “Share your Idea” 改为 **Save to NAND flash**：Agent 通过 USB 装的 Idea 只在运行区，存到 NAND 后才会出现在 Ideas 里，下次可以切回来。没有开发版时这一行置灰：`Install an Idea over USB first`。
+
+### 状态栏
+
+USB 未连接时和 Wi‑Fi 断开一样，显示**灰色带斜线**的 USB 图标。
+
+### 图标配色
+
+上一版每个功能一种颜色（蓝、青、紫、琥珀），在黑底上显得杂、像玩具。现在统一成一套单色：
+
+| 用途 | 图块 | 图标 |
 | --- | --- | --- |
-| `sans` | Inter Regular 400 | 16 / 18 / 24 |
-| `medium` | Archivo Extended Medium 500 | 18 / 22 / 28 |
-| `dot` | Archivo Extended SemiBold 600 | 18 / 22 / 28 / 40 / 88 |
+| 普通（neutral） | 石墨 `#232323` | 米白 `#E9E2D6`（设备外壳的颜色） |
+| 需要注意（accent） | 橙色 16 % | 橙 `#FF4C01`（如 Vibe-code、Update to …） |
+| 不可用（muted） | `#1A1A1A` | 灰 `#9A9A9A` |
 
-`dot` 只是历史兼容键名，不表示点阵文字。
+一个页面里最多一个橙色图块；功能靠图标形状区分，不靠颜色。
 
-### 触控与图标
+### 键盘
 
-| 对象 | 规则 |
+| 键盘 | 做法 |
 | --- | --- |
-| 默认触控 | ≥84×84 px |
-| 密集例外 | 列表行、数字键盘键 ≥72 px；原生键盘沿用设备规范 |
-| 页头圆形按钮 | 可见圆 64 px，透明命中区 84 px |
-| 危险操作 | 高 96 px、距屏幕边 24 px、距其他按钮 ≥24 px；按住 600 ms |
-| 线性图标 | 按钮/标题 32 px；文字旁 ≥20 px |
-| 点阵图形 | 分类、引导、空状态、结果和加载动画使用预渲染位图 |
+| 全键盘 GO | 输入有效时才是橙色：密码 ≥8 位；Shared 的 key / value 非空。否则和功能键同色、文字变暗，按下给出说明 |
+| ID 键盘 Go | 输满 6 位才变橙色；查询中变回灰色 |
+| 按下放大 | ID 键盘按下时键位放大 14 %（设计图 `download-typing` 展示：键位四周各外扩 6 px 并提亮）；全键盘保留放大气泡 |
+| 触感 | **按下（touch-down）即触发**，不等抬起：普通键一下 8 ms 的“嗒”；GO / Go 可用时 8 ms + 45 ms 间隔 + 8 ms 的双击感；不可用时一下 24 ms 的低沉震动；长按退格清空 14 ms |
 
-## 3. 页面与状态（66 个）
+触感参数在 `layout.json` 的 `tokens.haptics`。固件建议用 LRA 在谐振频率驱动并主动刹车，8 ms 的脉冲才会“清脆”而不是“嗡”。原型里：支持 Vibration API 的手机（Android Chrome）会真实震动，其他设备用很短的“嗒”声代替，可在右侧“模拟”里关闭。
+
+### Toast 位置
+
+有底部按钮的页面（Idea info、结果页、Shared 条目、Help 主题、About、进度、当前网络）和 ID 键盘页，toast 自动上移，不遮挡按钮（`tokens.toast.lift`）。
+
+## 3. 480×480 设计系统
+
+| 项目 | 值 |
+| --- | --- |
+| 屏幕 | 480×480，显示宽 38.8 mm，`SCREEN_R = 60` |
+| 外边距 | 常规 16 px；底部操作按钮 24 px |
+| 根页面 | 状态栏 y < 56（固定），内容区横向翻页，页码圆点 y = 440（固定） |
+| 二级页页头 | 返回圆 (16, 20)，标题 x = 88，内容 y = 96；没有状态栏 |
+| 列表行 | 80 px 卡片 + 8 px 间隔（88 px 行距），前导 56 px，常显滚动条 |
+| 底部操作 | y = 380，高 84；Idea info 为 y = 360、高 96（长按目标） |
+| 默认触控 | ≥84×84；密集（列表行、键盘、左滑 Delete、确认框勾选行）≥72 |
+| 长按 | 3 s，高 96 px，距屏幕边 ≥24 px、距其他按钮 ≥24 px |
+| 字号 | `sans` 16/18/24 · `medium` 16/18/22/28 · `dot` 18/22/28/40/88 |
+| 颜色 | 背景 `#000` · 卡片 `#141414` · 强调橙 `#FF4C01` · 删除红 `#E5484D` · 米白 `#E9E2D6` · 主按钮 `#F2F2F2` / `#000` |
+| 方向 | 0 / 90 / 180 / 270°，面板旋转，不重排 |
+| 息屏 | 背光 10 %，Wi‑Fi 断开，1 / 3 / 5 / 10 分钟 / Never |
+
+## 4. 页面与状态（69 个）
 
 | 区域 | 状态 |
 | --- | --- |
-| Guide | 5 步 |
-| Home | My apps、Favorites、分类、三种空状态、AI 提示、后台更新中、Browse 面板、快速切换 |
-| Download | 空、输入中、查询中、报错 |
-| Develop | Agent 已连接、等待 Agent（原型另有 USB 未插） |
-| Detail | current、local、remote、update、nospace；About（本机 / 商店）；长按删除中；全屏 QR |
-| Progress | Agent、download、install、update |
-| Result | installed、saved、updated、failed、nospace、battery |
-| Help | 主题列表；点按直接全屏 QR |
-| Wi‑Fi | 已连接、未连接、待续任务、连接中、当前网络、密码（输入 / 连接中 / 错误） |
-| Device | 设置列表、Wi‑Fi link、Updates（可更新 / 进行中 / 已最新 / 离线）、Storage（正常 / 将满） |
-| Shared | City、City 输入、Mosaico AI（mosaico / own / none）、Own key |
-| 运行 | Launching、App running |
+| Home | 默认、首次使用（三角提示 + 页名）、离线、按下 AI（Lock 反馈） |
+| 息屏 | 低亮度 Make Ideas Run · Vibe Mode |
+| Ideas | 页 1–4（含页名）、空列表、打开确认框 |
+| Manage | 有更新、更新中、左滑露出 Delete、删除后 Undo、已是最新 |
+| Idea info | local / update / remote / nospace / current、长按删除中 |
+| Download | 空、输入中（按住一个键）、满 6 位、查询中、报错、离线 |
+| Progress / Result | download、install、switch、agent；saved / failed / nospace / battery |
+| Develop | ready / waiting / unplugged |
+| Settings / Display / Help / About | 可滚动列表、按下 AI（Back 反馈）、Display（3 分钟 + 自动旋转 / 永不 + 锁定方向）、帮助主题、关于 |
+| Boot 键 | 更新说明（二维码）、更新模式 |
+| Wi‑Fi | 已连、未连、待续任务、连接中、当前网络、密码三态 |
+| Shared | 列表、左滑、空、说明页、条目、新 key、value、改 key |
+| 二维码 | 开发指南、某个 Idea |
+| 其它 | Launching、Running、Boot |
 
-机器可读定义见 `layout.json`；命名对象和坐标见 `layout-tables.md`。
+机器可读定义见 `layout.json`；命名对象见 `layout-tables.md`。
 
-## 4. 交互表
+## 5. 交互表
 
 | # | 场景 | 行为 |
 | --- | --- | --- |
-| 1 | AI 单击 | 子页松开即返回；首页单击提示 “Press AI twice to switch apps”（最多 3 次，学会后不再提示） |
-| 2 | 快速切换 | 首页 AI 双击（350 ms 内）打开，从当前应用的下一个开始；单击选下一个；按住 600 ms 或点卡片打开 |
-| 3 | 快速切换空闲 | 4 s 无操作自动关闭；点卡片外关闭 |
-| 4 | 边缘返回 | 从左侧 24 px 内右滑：页面跟手，≥96 px 或快速甩动提交，否则弹回 |
-| 5 | 详情两屏 | 上滑 / 点 About this app 进第 2 屏；下滑或返回回第 1 屏 |
-| 6 | Browse 面板 | 点 My apps 打开；点上方空白或下拉关闭；切换筛选后列表回到顶部 |
-| 7 | 危险操作 | 按住 600 ms，进度画在按钮内，文字变 “Keep holding…”；提前松手取消；单击提示 “Hold to confirm” |
-| 8 | 退格 | 点按删一位；按住 600 ms 清空 |
-| 9 | 密码 | 提交后留在原页显示 Connecting…；错误也留在原页，键盘变暗不可输入 |
-| 10 | 离线续接 | 见第 1 节；离开 Wi‑Fi 页提示 Cancelled |
-| 11 | 空间预检 | 下载前计算剩余 NAND；不足时主按钮为 Free up space |
-| 12 | 低电量 | 阻止切换/安装，显示 Battery low 结果页 |
-| 13 | 安装完成 | 3 s 倒计时点后自动打开；可 Stay here / Open now |
-| 14 | 后台更新 | 逐个更新；状态栏 `↓ k/n`；断网暂停 |
-| 15 | 删除后 | 返回原列表并保持滚动位置 |
-| 16 | 键盘 | 字母按下显示放大气泡；密码和 key 默认遮蔽，可切换显示 |
-| 17 | 回到 Vibe Mode | 应用运行中按住 AI 并双击开关机键；松开 AI 前不响应按键 |
-| 18 | 横幅 | 顶部滑入；带操作的横幅可点按（如 updates → Updates 页） |
+| 1 | 横向翻页 | 内容跟手，状态栏和圆点不动；≥56 px 或甩动提交；落页后显示页名 2 s |
+| 2 | 打开 Idea | 点格子 → 确认框（可关闭以后不再问）→ 当前直接 Launching；其它先 Switching（1.5 s 内可 Cancel） |
+| 3 | AI 键 | 息屏：唤醒；弹窗：关闭；子页：返回；Ideas 页：回 Home；Home：息屏。按下时按键下方屏幕边缘亮橙条，松开显示动作名 |
+| 4 | 边缘返回 | 左缘 24 px 内右滑：≥96 px 或甩动提交 |
+| 5 | 更新 | Manage 页头 ↑ 按钮：逐个后台更新，转圈 + 剩余数量；断网暂停 |
+| 6 | 左滑删除 | 行左滑超过 52 px 停在露出 Delete；点别处先收起；当前 Idea 回弹 |
+| 7 | Undo | 列表删除立即生效，toast 4 s；离开页面或 toast 消失后才真正删除文件 |
+| 8 | 长按删除 | Idea info / 忘记 Wi‑Fi：按住 3 s；中途松手取消 |
+| 9 | 键盘 | 输入有效前 GO 为灰；按下即触感；ID 键按下放大 |
+| 10 | Download | 6 位 ID 逐格填入 → Go → 查询 → Idea info → Download |
+| 11 | Shared | ? 说明；+ 先 key 后 value；条目页分别改 Key / Value |
+| 12 | 开发 | Agent 装到运行区 → Develop → Save to NAND flash → 出现在 Ideas |
+| 13 | 离线续接 | 查询 / 下载 / 更新离线进 Wi‑Fi；连上后续跑；离开则 Cancelled |
+| 14 | 回到 Vibe Mode | 运行中按住 AI 并双击电源 |
+| 15 | 息屏 / 唤醒 | 首页按 AI 或超时 → 息屏；点屏 / 晃动 / 按键 → 唤醒，回原页面并重连 Wi‑Fi |
+| 16 | 旋转 | IMU 换方向 → 面板旋转；按住屏幕、在键盘页或长按删除时先不转 |
+| 17 | Boot 键 | 按住：更新说明；按住 + 双击电源：更新模式；更新模式里按一次电源：重启 |
 
-## 5. 主要流程
-
-1. **打开应用**：Home → 应用行 → Detail → Open app（非当前应用先切换，再倒计时打开）。
-2. **按 ID 下载**：Download → 输入 ID → Go → Detail → Download & open / Save → 进度 → 结果。
-3. **离线下载**：Go → Wi‑Fi（显示 “Connect to look up 238114”）→ 选网络 → 密码 → 连上后自动继续查询。
-4. **批量更新**：横幅或 Device → App updates → Update all → 后台进行，可继续使用。
-5. **释放空间**：Free up space 或 Device → App storage → 选应用 → Hold to delete。
-6. **Mosaico AI**：首次联网自动开启；可 Hold to turn off；Turn on Mosaico AI 离线时先去 Wi‑Fi。
-7. **帮助**：Help → 主题 → 全屏二维码。
-
-## 6. 英文文案
-
-固定文案在 `tools/build_design.py` 中按真实字体测宽并检查字形覆盖。
-
-| 区域 | 文案 |
-| --- | --- |
-| Home | `My apps` · `Current app` · `↑ Update available` · `↑ 2` · `↓ 1/2` |
-| Detail | `Open app` · `Update` · `QR code` · `Download & open` · `Save` · `Update & open` · `Free up space` · `About this app` |
-| Danger | `Hold to delete` · `Hold to forget` · `Hold to turn off` · `Hold to remove key` · `Keep holding…` |
-| Updates | `Update all` · `Keep using Vibe Mode` · `All up to date` · `Can't check now` |
-| Storage | `<used> MB of 64 MB used` · `LARGEST FIRST · TAP TO DELETE` |
-| Result | `App installed` · `Saved to My apps` · `Update complete` · `Couldn't download` · `Not enough storage` · `Battery low` |
-| Mosaico AI | `Mosaico AI is on` · `Using your own key` · `Mosaico AI is off` · `Turn on Mosaico AI` · `Use my own key` |
-| Guide | `Get started` · `Back` · `Next` · `Later` · `Connect` |
-
-应用名、SSID 和商店简介动态截断；商店简介限制 ASCII ≤120 字节，且在详情第 2 屏 ≤3 行。
-
-## 7. 资源
-
-`tools/generate_assets.py` 每次执行都会：
-
-1. 从 `--mosaico-fonts` 重建 Archivo Extended 500/600 与 Inter 400（按 upm 写入正确的行高度量）；默认路径为：
-   `/Users/zhanzhaocheng/project/esp-mosaico/design/mosaico-ui/src/assets/fonts`
-2. 可选从 `--google-fonts` 更新 Noto Sans SC 中文阶段子集。
-3. 按 `ICON_OUTPUTS` 生成 20/28/32 px 线性图标（白 / 灰 / 橙 / 黑 / 暗色变体）。
-4. 按 `PICTOGRAMS` 生成 `assets/mosaic/` 点阵图块与主视觉。
-5. 生成 `assets/anim/` 加载动画帧、`assets/qr/` 二维码和 `assets/ui/` 列表渐隐。
-
-字体许可证：
-
-- `assets/fonts/OFL-Archivo.txt`
-- `assets/fonts/OFL-Inter.txt`
-- `assets/fonts/OFL-NotoSansSC.txt`（中文阶段来源）
-
-## 8. 本地数据与 sysmeta
-
-应用文件仍位于：
+## 6. 本地数据与 sysmeta
 
 ```text
-/nand/apps/<app_id>/app.json
-/nand/apps/<app_id>/manifest.json
-/nand/apps/<app_id>/<components>
-/nand/apps/.<app_id>.part/
+/nand/ideas/<idea_id>/…
+sysmeta/wifi/*                   # Wi‑Fi（Settings → Wi‑Fi 管理）
+sysmeta/shared/<key>             # 用户自定义；key ≤15（a–z 0–9 _），value 字符串 ≤256
+sysmeta/vibe_prefs/pager_hint    # 首页翻页提示已看过
+sysmeta/vibe_prefs/open_confirm  # 打开 Idea 前是否确认
+sysmeta/vibe_prefs/display       # screen_off_s（60/180/300/600/0）、auto_rotate
 ```
 
-使用或新增以下 `sysmeta` 键：
+删除 Idea / 条目在 Undo 窗口结束后再提交到 NAND / NVS。改 key 是“写新 key、删旧 key”的一次事务。
 
-| Key | 内容 |
-| --- | --- |
-| `vibe_apps/favorites` | 收藏 ID，最多 64 个 |
-| `vibe_apps/recent` | 最近打开 ID，CURRENT 不重复写入，按最近优先 |
-| `vibe_prefs/filter` | 上次列表筛选 |
-| `vibe_prefs/ai_hint` | AI 提示次数与是否已学会双击 |
-| `vibe_prefs/ai_opt_out` | 用户主动关闭 Mosaico AI 后不再自动开启 |
-| `vibe_prefs/guide_done` | 首次引导已完成 |
-| `shared/city` | 所有应用可读的城市 |
-| `shared/ai_token` | 所有应用可读的 token/key |
-| `shared/ai_token_kind` | `mosaico` / `own` / `none` |
-| `wifi/*` | 已有 Wi‑Fi 配置 |
+## 7. 阶段 B handoff
 
-`shared/ai_token_kind=none`、未主动关闭且首次在线时自动申领 Mosaico token；成功后原子写入 token 和 kind。社区应用可读共享 token，产品应优先发放限额、可吊销、按设备区分的 token。
+- 保持 `layout.json` 对象名和 `tokens`（`row`、`tints`、`haptics`、`toast.lift`）、`prototype.interactions`（`undo_ms`、`swipe_*`、`page_label_ms`、`danger_hold_ms`）。
+- 根层：状态栏和圆点放在横向 pager 容器之外；二级页用原生 Stack，不挂状态栏。
+- 长按删除：按下时把 Open / Delete 动画到 `hold_expand` 指定的矩形，显示 `delete_popup`；计时 3 s，中途松手还原。
+- 触感在 touch-down 中断里直接触发，不要排到 UI 刷新之后。
+- 旋转用面板配置实现（不在软件里转帧缓冲）；触摸变换和面板同步切换。
+- 息屏：关 Wi‑Fi、背光 10 %、停止刷新；IMU 运动中断 + 触摸唤醒 + 按键唤醒。
+- AI 键反馈画在面板坐标（设备固定），不随界面方向。
+- 真机复核：R60 裁切、84 px 触控、QR（6 px 模块）扫描距离、AI GPIO、LRA 手感、帧率。
 
-## 9. Mosaico Ideas 商店接口需求
-
-| 编号 | 需求 |
-| --- | --- |
-| R1 | 按纯数字 ID 查询最新版；设备无商店会话和配对步骤 |
-| R2 | 请求携带 MAC、Vibe 版本、兼容字段、reason 和本地版本 |
-| R3 | 返回 ASCII 显示名、版本、official、分类、≤120 字节简介 |
-| R4 | 返回稳定详情 URL，建议 ≤53 字节以保持 QR version 3-L |
-| R5 | 返回 System Update manifest 与 HTTPS 组件 URL |
-| R6 | 区分不存在、下架、不兼容、无权限、限流、维护和网络错误 |
-| R7 | ID 号段由服务端管理，设备只验证纯数字 |
-| R8 | 第三方 NAND 风险在商店网页提示 |
-| R9 | 支持按 ID 的下载/安装统计 |
-| R10 | 代理 token（Mosaico AI）的发放、配额、吊销与续期；设备首次联网可自动申领 |
-| R11 | 批量查询本地应用的最新版本（供 Updates / Update all） |
-| R12 | 更新响应提供稳定 operation/release ID、ETag/长度并支持 HTTPS Range，以便断线续传和同版本恢复 |
-| R13 | 返回下载大小、落盘大小和安装临时空间需求；设备可在传输前完成 NAND 空间预检 |
-
-设备端仍要求 TLS 校验、HTTPS-only、最多 3 次 HTTPS 重定向、流式 SHA-256 校验和原子目录替换。
-
-## 10. 阶段 B handoff
-
-本轮不修改固件。阶段 B 实现时需：
-
-- 保持 `layout.json` 中的对象名、行高和 `prototype.interactions` 常量。
-- 用 GSP 原生 StackView/列表/键盘实现；详情两屏为纵向 snap；Browse 为底部面板覆盖层。
-- 将按住进度绑定 600 ms 定时器，离页/松手时取消。
-- 后台更新、续接任务、空间预检、token 自动申领和 sysmeta 写入做成可恢复事务。
-- 在真机复核 38.8 mm 下的字号、R60 裁切、QR 扫描、触摸、AI GPIO、NAND 容量和帧率。
-
-## 11. 再生成与验证
+## 8. 再生成与验证
 
 ```sh
 cd esp-mosaico-recovery/docs/vibe-mode-0.3-design
 
-.venv/bin/python tools/generate_assets.py
+.venv/bin/python tools/generate_assets.py          # 或 --skip-fonts
 .venv/bin/python tools/build_design.py --strict
 .venv/bin/python tools/build_prototype.py
 node tools/prototype_smoke.js [截图目录]
@@ -235,12 +214,6 @@ node tools/prototype_smoke.js [截图目录]
 预期：
 
 ```text
-66 states rendered; 0 layout issues
-66 passed, 0 failed
-```
-
-如 Playwright 不在默认 Node 搜索路径中：
-
-```sh
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright node tools/prototype_smoke.js
+69 states rendered; 0 layout issues
+153 passed, 0 failed
 ```

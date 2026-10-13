@@ -24,7 +24,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from sample_data import QR_APPS
+from sample_data import GLYPHS, QR_APPS
 
 DESIGN = Path(__file__).resolve().parents[1]
 ASSETS = DESIGN / "assets"
@@ -54,7 +54,10 @@ QR_CODES = {
     "help-start": "https://mosaico.espressif.com/vibe/start",
     "help-ids": "https://mosaico.espressif.com/vibe/ids",
     "help-fix": "https://mosaico.espressif.com/vibe/fix",
+    "vibe-update": "https://mosaico.espressif.com/vibe/update",
 }
+QR_CODES.update({f"idea-{app['id']}": app["url"] for app in QR_APPS})
+# Keep legacy app-* aliases so older QR filenames still resolve if referenced.
 QR_CODES.update({f"app-{app['id']}": app["url"] for app in QR_APPS})
 QR_VERSION, QR_BORDER = 3, 2
 QR_MODULES = 17 + 4 * QR_VERSION + 2 * QR_BORDER  # 33
@@ -403,17 +406,55 @@ ICONS = {
     "replay": lambda p: (p.arc(12, 12.5, 7.5, 270, 570, 2.0),
                          p.line([(14.8, 2.0), (12, 5.0), (14.8, 8.0)], 2.0)),
 }
+def _arc_arrow(p: Pen, cx, cy, r, a0, a1, width=1.8, head=3.2) -> None:
+    """Arc from a0 to a1 (degrees, clockwise on screen) with an arrowhead at a1 along the tangent."""
+    p.arc(cx, cy, r, a0, a1, width)
+    t = math.radians(a1)
+    ex, ey = cx + r * math.cos(t), cy + r * math.sin(t)
+    dx, dy = -math.sin(t), math.cos(t)  # direction of travel at a1
+    for side in (-1, 1):
+        a = math.atan2(-dy, -dx) + side * math.radians(38)
+        p.line([(ex + head * math.cos(a), ey + head * math.sin(a)), (ex, ey)], width)
+
+
+def _rotate(p: Pen) -> None:
+    p.rrect(9, 7.5, 15, 16.5, 1.6, 1.7)
+    _arc_arrow(p, 12, 12, 9.4, 200, 300)
+    _arc_arrow(p, 12, 12, 9.4, 20, 120)
+
+
+def _signal(bars: int):
+    def draw(p: Pen) -> None:
+        for i, h in enumerate((5, 8, 11, 14)):
+            x = 4.5 + i * 4.2
+            if i < bars:
+                p.rrect(x, 20 - h, x + 2.6, 20, 0.6, None)
+            else:
+                p.rrect(x, 20 - h, x + 2.6, 20, 0.6, 1.2)
+    return draw
+
+
 ICONS.update({
     "clock": lambda p: (p.circle(12, 12, 8.6, 1.8), p.line([(12, 7.2), (12, 12), (15.6, 14.2)], 1.8)),
     "lock": lambda p: (p.rrect(5.5, 10.5, 18.5, 20, 2.2, 1.8), p.arc(12, 9.5, 4.2, 180, 360, 1.8),
                        p.line([(7.8, 9.5), (7.8, 10.6)], 1.8), p.line([(16.2, 9.5), (16.2, 10.6)], 1.8)),
-    "page_download": ICONS["download"],
-    "page_develop": ICONS["code"],
-    "page_device": ICONS["chip"],
-    "page_help": ICONS["help"],
-    "page_updates": ICONS["refresh"],
-    "page_storage": ICONS["storage"],
-    "page_wifi": ICONS["wifi"],
+    "settings": _gear,
+    "plus": lambda p: (p.line([(12, 4.5), (12, 19.5)], 2.2), p.line([(4.5, 12), (19.5, 12)], 2.2)),
+    "signal_0": _signal(0), "signal_1": _signal(1), "signal_2": _signal(2), "signal_3": _signal(3),
+    "globe": lambda p: (p.circle(12, 12, 8.6, 1.8), p.earc(8.2, 3.4, 15.8, 20.6, 0, 360, 1.6),
+                        p.line([(3.6, 12), (20.4, 12)], 1.6)),
+    # Upgrade: an arrow rising off a base line (reads as "newer version", unlike refresh).
+    "upgrade": lambda p: (p.line([(12, 17), (12, 4.5)], 2.0), p.line([(7, 9.5), (12, 4.5), (17, 9.5)], 2.0),
+                          p.line([(5, 20.5), (19, 20.5)], 2.0)),
+    "usb_off": lambda p: (_usb(p), p.line([(4, 4), (20, 20)], 4.4, value=0), p.line([(4.5, 4.5), (19.5, 19.5)], 1.9)),
+    # Auto-rotate: a device outline inside a turning arrow.
+    "rotate": lambda p: _rotate(p),
+    "alert": lambda p: (p.circle(12, 12, 9, 1.9), p.line([(12, 7), (12, 13.2)], 2.2), p.dot(12, 16.8, 1.4)),
+    # Pointers to the physical keys (AI on top, power at the bottom).
+    "arrow_up": lambda p: (p.line([(12, 20), (12, 4.5)], 2.4), p.line([(5.5, 11), (12, 4.5), (18.5, 11)], 2.4)),
+    "arrow_down": lambda p: (p.line([(12, 4), (12, 19.5)], 2.4), p.line([(5.5, 13), (12, 19.5), (18.5, 13)], 2.4)),
+    # First-use pager hint: a solid triangle pointing the way to swipe.
+    "tri_left": lambda p: p.polygon([(16.5, 4.5), (6, 12), (16.5, 19.5)]),
 })
 
 
@@ -421,25 +462,35 @@ ICONS.update({
 # list holds only what layouts or the prototype's runtime swaps reference.
 _BROWSE = ("grid", "clock", "star", "display", "audio", "house", "sensor", "chat", "motor")
 ICON_OUTPUTS = [
-    # 20 px: inline icons beside text and row chevrons (spec minimum).
-    *[(name, 20, "white") for name in ("wifi", "pin", "robot", "refresh", "storage", "key", "info", "qr",
-                                       "flag", "code", "hash", "support", "chevron_down")],
-    *[(name, 20, "grey") for name in ("lock", "wifi", "usb", "qr", "star_fill")],
-    ("usb", 20, "orange"), ("chevron", 20, "dim"), ("chevron_down", 20, "dim"),
-    # 28 px: status strip and keyboard function keys.
-    ("wifi", 28, "white"), ("wifi_off", 28, "grey"), ("robot", 28, "orange"), ("robot", 28, "grey"),
-    ("battery_full", 28, "white"), ("battery_mid", 28, "white"), ("battery_low", 28, "orange"),
-    ("battery_charging", 28, "white"), ("back", 28, "white"), ("backspace", 28, "white"),
-    # 32 px: icons inside buttons, cards and page titles.
-    *[(name, 32, "white") for name in ("back", "help", "chip", "star", "qr", "refresh", "download", "code",
-                                       "share", "usb", "backspace", "eye", "eye_off", *_BROWSE)],
-    *[(name, 32, "black") for name in ("download", "play", "storage", "refresh", "wifi", "robot")],
-    *[(name, 32, "orange") for name in ("star_fill", "trash", "power", "wifi", "wifi_off", "download", "code",
-                                        *_BROWSE)],
-    ("wifi_off", 32, "grey"), ("usb", 32, "grey"),
-    *[(name, 32, "orange") for name in ("page_download", "page_develop", "page_device", "page_help")],
+    # 20 px: top nav bar and inline row icons.
+    *[(name, 20, "white") for name in ("wifi", "usb", "battery_full", "battery_mid", "battery_charging",
+                                       "refresh", "info", "qr", "code", "key", "chevron", "chevron_down",
+                                       "plus", "signal_3", "signal_2", "signal_1")],
+    *[(name, 20, "grey") for name in ("wifi_off", "usb", "usb_off", "lock", "qr", "signal_0", "globe")],
+    ("check", 20, "black"), ("tri_left", 24, "orange"), ("alert", 20, "red"), ("chevron", 20, "red"),
+    *[(name, 24, color) for name in ("arrow_up", "arrow_down") for color in ("orange", "white")],
+    *[(name, 20, "orange") for name in ("battery_low", "usb")],
+    ("chevron", 20, "dim"), ("chevron_down", 20, "dim"),
+    # 28 px: keyboard function keys.
+    ("back", 28, "white"), ("backspace", 28, "white"),
+    # 32 px: buttons, cards and page titles.
+    *[(name, 32, "white") for name in ("back", "help", "chip", "qr", "refresh", "download", "code",
+                                       "share", "usb", "wifi", "backspace", "eye", "eye_off", "settings",
+                                       "plus", "play", "grid", "upgrade", "trash", *_BROWSE)],
+    *[(name, 32, "black") for name in ("download", "play", "refresh", "wifi", "code", "settings", "trash")],
+    *[(name, 32, "orange") for name in ("trash", "power", "wifi", "wifi_off", "download", "code",
+                                        "settings", "refresh", "upgrade", *_BROWSE)],
+    ("wifi_off", 32, "grey"), ("usb", 32, "grey"), ("chip", 32, "grey"), ("storage", 32, "grey"),
+    # 32 px on list tiles: warm cream (the device body colour) on graphite.
+    *[(name, 32, "cream") for name in ("wifi", "usb", "key", "lock", "help", "chip", "flag", "hash", "support",
+                                       "id", "storage", "code", "signal_1", "signal_2", "signal_3", "display",
+                                       "rotate")],
+    ("trash", 32, "red"), ("wifi_off", 32, "red"),
+    # 56 px: the "+ Add Idea" cell at the end of the Ideas pages.
+    ("plus", 56, "white"),
 ]
-COLORS = {"white": WHITE, "grey": GREY, "dim": DIM, "black": BLACK, "orange": ORANGE}
+COLORS = {"white": WHITE, "grey": GREY, "dim": DIM, "black": BLACK, "orange": ORANGE,
+          "cream": (233, 226, 214), "red": (229, 72, 77)}
 
 # Dot-matrix pictograms on a 7 x 7 grid: '#' white dot, 'o' orange accent dot,
 # '.' an unlit dot. Every pictogram reads as one object at 56 px and above.
@@ -579,6 +630,19 @@ UNLIT_ON_TILE = (54, 54, 54)
 UNLIT_ON_BLACK = (30, 30, 30)
 
 
+CIRCLE_BG = (242, 242, 242)
+CIRCLE_INK = (20, 20, 20)
+
+
+def _draw_glyph(draw: ImageDraw.ImageDraw, cells: list[str], pad: float, pitch: float, r: float,
+                lit=WHITE, accent=ORANGE, unlit=UNLIT_ON_BLACK) -> None:
+    for row, line in enumerate(cells):
+        for col, cell in enumerate(line):
+            cx, cy = pad + (col + 0.5) * pitch, pad + (row + 0.5) * pitch
+            color = {"#": lit, "o": accent}.get(cell, unlit)
+            draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(*color, 255))
+
+
 def _pictogram(size: int, key: str, tile: bool) -> Image.Image:
     """Render one pictogram; tiles get the rounded TILE square behind the dots."""
     ss = 4
@@ -590,11 +654,22 @@ def _pictogram(size: int, key: str, tile: bool) -> Image.Image:
         draw.rounded_rectangle((0, 0, big - 1, big - 1), round(big * 0.25), fill=(*TILE_BG, 255))
     pitch = (big - 2 * pad) / 7
     r = pitch * 0.36
-    for row, cells in enumerate(PICTOGRAMS[key]):
-        for col, cell in enumerate(cells):
-            cx, cy = pad + (col + 0.5) * pitch, pad + (row + 0.5) * pitch
-            color = {"#": WHITE, "o": ORANGE}.get(cell, UNLIT_ON_TILE if tile else UNLIT_ON_BLACK)
-            draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(*color, 255))
+    _draw_glyph(draw, PICTOGRAMS[key], pad, pitch, r, unlit=UNLIT_ON_TILE if tile else UNLIT_ON_BLACK)
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def _circle_icon(size: int, cells: list[str]) -> Image.Image:
+    """White circle with dark+orange 7x7 dots (Idea grid icon, matches figure 1)."""
+    ss = 4
+    big = size * ss
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse((0, 0, big - 1, big - 1), fill=(*CIRCLE_BG, 255))
+    # Fill most of the circle so glyphs read at a glance (fig.1 style), not as a tiny stamp.
+    pad = big * 0.12
+    pitch = (big - 2 * pad) / 7
+    r = pitch * 0.40
+    _draw_glyph(draw, cells, pad, pitch, r, lit=CIRCLE_INK, accent=ORANGE, unlit=(200, 200, 200))
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -617,12 +692,39 @@ def _ring_frames(size: int, frames: int = 8) -> list[Image.Image]:
     return out
 
 
-# (pictogram, size, tile?) — every size is the exact on-screen box.
+# Home hero: bulb (idea) morphs into a play triangle (run), 8 frames.
+HOME_FRAMES = [
+    ["...o...", "..###..", ".#...#.", "#.....#", ".#...#.", "..#.#..", "...#..."],
+    ["...o...", "..###..", ".#...#.", "#..#..#", ".#...#.", "..#.#..", "...#..."],
+    [".......", "..###..", ".#...#.", "#..o..#", ".#...#.", "..###..", "......."],
+    [".......", ".#####.", "#.....#", "#..o..#", "#.....#", ".#####.", "......."],
+    [".......", ".####..", "#...#..", "#..o#..", "#...#..", ".####..", "......."],
+    [".......", ".###...", "#..##..", "#.o##..", "#..##..", ".###...", "......."],
+    [".......", ".##....", "#.###..", "#o###..", "#.###..", ".##....", "......."],
+    [".......", ".#.....", "#.###..", "#o####.", "#.###..", ".#.....", "......."],
+]
+
+
+def _home_frames(size: int = 120) -> list[Image.Image]:
+    out = []
+    for cells in HOME_FRAMES:
+        ss = 4
+        big = size * ss
+        img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        pad = big * 0.08
+        pitch = (big - 2 * pad) / 7
+        r = pitch * 0.36
+        _draw_glyph(draw, cells, pad, pitch, r)
+        out.append(img.resize((size, size), Image.LANCZOS))
+    return out
+
+
 PICTOGRAM_OUTPUTS = [
     *[(key, size, True) for key in ("display", "audio", "smart-home", "sensors", "communication", "motor",
-                                     "community", "other") for size in (56, 96, 120)],
+                                     "community", "other") for size in (56, 96)],
     *[(key, 120, False) for key in ("vibe", "wifi", "check", "saved", "cross", "full", "battery")],
-    *[(key, 80, False) for key in ("empty", "star", "folder")],
+    *[(key, 80, False) for key in ("empty", "folder")],
 ]
 
 
@@ -642,6 +744,9 @@ def build_icons() -> None:
     for key, size, tile in PICTOGRAM_OUTPUTS:
         kind = "tile" if tile else "hero"
         _pictogram(size, key, tile).save(pics / f"{kind}_{key}-{size}.png", optimize=True)
+    for key, cells in GLYPHS.items():
+        for size in (56, 96, 108):
+            _circle_icon(size, cells).save(pics / f"idea_{key}-{size}.png", optimize=True)
     anim = ASSETS / "anim"
     anim.mkdir(parents=True, exist_ok=True)
     for stale in anim.glob("*.png"):
@@ -649,6 +754,8 @@ def build_icons() -> None:
     for size in (32, 64):
         for i, frame in enumerate(_ring_frames(size)):
             frame.save(anim / f"spin{size}-{i:02d}.png", optimize=True)
+    for i, frame in enumerate(_home_frames(120)):
+        frame.save(anim / f"home-{i:02d}.png", optimize=True)
 
 
 def build_ui() -> None:

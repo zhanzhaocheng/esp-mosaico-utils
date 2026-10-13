@@ -1,4 +1,4 @@
-// Playwright smoke coverage for the Vibe Mode v6 single-file prototype.
+// Playwright smoke coverage for the Vibe Mode v10 single-file prototype.
 // Usage: node tools/prototype_smoke.js [screenshot-dir]
 // Set PLAYWRIGHT_MODULE if Playwright is installed outside this directory.
 const path = require('path');
@@ -23,44 +23,45 @@ const check = (condition, message) => {
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(`console: ${message.text()}`);
   });
+  // Record haptics: navigator.vibrate is stubbed so touch-down timing can be checked.
+  await page.addInitScript(() => { window.__vib = []; navigator.vibrate = (p) => { window.__vib.push(p); return true; }; });
   await page.goto(`file://${pageFile}`);
   await page.waitForTimeout(400);
 
-  // The live page is the last .page layer; the leaving one is removed after the slide.
+  // The live page is the last .page layer; a leaving one is removed after its slide.
   const loc = (name) => page.locator(`#screen [data-name="${name}"]`).last();
   const has = async (name) => (await page.locator(`#screen [data-name="${name}"]`).count()) > 0;
-  const text = async (name) => ((await loc(name).textContent().catch(() => null)) || '').trim();
+  const text = async (name) => ((await loc(name).textContent({ timeout: 1500 }).catch(() => null)) || '').trim();
   const view = () => page.evaluate(() => cur().view);
-  const toastText = async () => ((await page.locator('#screen .toast-layer').textContent().catch(() => '')) || '').trim();
+  const mdl = (fn) => page.evaluate(fn);
   const settle = (ms = 340) => page.waitForTimeout(ms);
   const tap = async (name, wait = 340) => { await loc(name).click(); await settle(wait); };
   const panel = async (id, wait = 240) => { await page.locator(`#${id}`).click(); await settle(wait); };
   const blur = () => page.evaluate(() => document.activeElement?.blur());
-  const ai = async (ms = 55, wait = 140) => {
+  const ai = async (ms = 55, wait = 420) => {
     await blur();
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(ms);
     await page.keyboard.up('ArrowUp');
     await page.waitForTimeout(wait);
   };
-  const aiDouble = async () => { await ai(55, 60); await ai(55, 420); };
-  const reset = async () => { await panel('simReset', 420); await page.evaluate(() => hideToast()); };
+  const reset = async () => { await panel('simReset', 450); };
   const rows = (kind) => page.locator(`#screen .row-hit[data-row^="${kind}:"]`);
   const rowLabels = async (kind) => rows(kind).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
   const center = async (name) => {
     const box = await loc(name).boundingBox();
     return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   };
-  const hold = async (name, ms = 700) => {
+  const hold = async (name, ms = 760) => {
     const c = await center(name);
     await page.mouse.move(c.x, c.y);
     await page.mouse.down();
     await page.waitForTimeout(ms);
     await page.mouse.up();
-    await settle(380);
+    await settle(420);
   };
   const screenBox = async () => page.locator('#screen').boundingBox();
-  const drag = async (x0, y0, x1, y1, steps = 8, wait = 420) => {
+  const drag = async (x0, y0, x1, y1, steps = 8, wait = 480) => {
     const b = await screenBox(), k = b.width / 480;
     await page.mouse.move(b.x + x0 * k, b.y + y0 * k);
     await page.mouse.down();
@@ -68,234 +69,526 @@ const check = (condition, message) => {
     await page.mouse.up();
     await settle(wait);
   };
+  // Swipe a list row horizontally (negative dx = left), in screen pixels.
+  const swipeRow = async (kind, i, dx = -170) => {
+    const b = await rows(kind).nth(i).boundingBox(), k = (await screenBox()).width / 480;
+    const x0 = b.x + b.width * 0.7, y = b.y + b.height / 2;
+    await page.mouse.move(x0, y);
+    await page.mouse.down();
+    for (let s = 1; s <= 8; s++) await page.mouse.move(x0 + dx * k * s / 8, y);
+    await page.mouse.up();
+    await settle(360);
+  };
+  const openDelete = () => page.locator('#screen .swipe-row.open [data-name="button_swipe_delete"]');
+  const slots = async () => (await Promise.all([0, 1, 2, 3, 4, 5].map((i) => text(`id_slot_${i}`)))).join('');
+  const noStatusBar = () => mdl(() => !pageLayer.querySelector('[data-name="nav_badge"]'));
   const typeKeys = async (s) => { await blur(); for (const ch of s) await page.keyboard.press(ch); };
   const shot = async (name) => { if (out) await page.locator('#screen').screenshot({ path: path.join(out, `${name}.png`) }); };
+  const toManage = async () => { await tap('button_manage'); };
+  const toDownload = async () => { await toManage(); await tap('button_add_download'); };
+  const openTile = async (id, wait = 400) => { await tap(`button_idea_${id}`, 300); await tap('button_confirm_open', wait); };
+  const vib = () => mdl(() => window.__vib.length);
+  const bg = (name) => loc(name).evaluate((el) => getComputedStyle(el).backgroundColor);
+  // Images on the live page that failed to load (empty src or no pixels).
+  const brokenImgs = () => page.evaluate(() => [...pageLayer.querySelectorAll('img')].filter((i) => !i.getAttribute('src') || !i.naturalWidth).length);
+  const kbGo = () => page.locator('#screen .kb-key[data-key="kb:go"]').last().getAttribute('data-ready');
 
-  // 1. Load, tokens and gallery.
+  // 1. Load, tokens, gallery.
   check(errors.length === 0, 'loads without script errors');
-  check(await page.locator('.thumb').count() === 66, 'gallery lists 66 design states');
-  const tokens = await page.evaluate(() => ({ r: T.screen.corner_radius, touch: T.min_touch, hold: I.danger_hold_ms }));
-  check(tokens.r === 60 && tokens.touch === 84 && tokens.hold === 600, 'R60, 84 px touch and 600 ms hold tokens');
-  await settle(500);
-  check((await toastText()).includes('2 updates'), 'launch toast announces 2 updates');
+  const stateCount = await mdl(() => LAYOUT.states.length);
+  check(await page.locator('.thumb').count() === stateCount && stateCount > 0, `gallery lists all ${stateCount} design states`);
+  const tokens = await mdl(() => ({ r: T.screen.corner_radius, touch: T.min_touch, hold: I.danger_hold_ms, undo: I.undo_ms, schema: LAYOUT.schema }));
+  check(tokens.r === 60 && tokens.touch === 84 && tokens.hold === 3000 && tokens.undo === 4000, 'R60, 84 px touch, 3 s hold and 4 s Undo tokens');
+  check(tokens.schema === 'vibe-mode-design/10', 'layout schema is vibe-mode-design/10');
+
+  // 2. Home: quiet status bar, pager dots, hero animation, first-use hint.
+  check(await view() === 'home' && await text('nav_badge') === '', 'home has no update badge in the status bar');
+  check(await has('pager_hint') && (await loc('pager_hint').evaluate((el) => getComputedStyle(el).animationName)) === 'nudge', 'first use shows the moving swipe hint');
+  check(await page.locator('#screen [data-name^="pager_hit_"]').count() === 5, 'pager has 5 tappable dots');
+  const f1 = await loc('home_hero').getAttribute('src');
+  await page.waitForTimeout(450);
+  const f2 = await loc('home_hero').getAttribute('src');
+  check(f1 && f2 && f1 !== f2, 'home hero animates');
   await shot('01-home');
-  await page.locator('#screen .toast-hit').click();
-  await settle();
-  check(await view() === 'updates', 'tapping the update toast opens Updates');
-  await reset();
 
-  // 2. Home list order and rows.
-  const labels = await rowLabels('apps');
-  check(labels.length === 20, 'home lists 20 apps');
-  check(labels[0] === 'Pixel Pet' && labels[1] === 'Weather Station', 'current app first, then recent');
-  check(await text('home_title') === 'My apps', 'filter label is My apps');
-  check(await text('status_badge') === '↑ 2', 'status strip shows ↑ 2');
-
-  // 3. Browse sheet: open, filter, close by tapping above the sheet and by dragging down.
-  await tap('button_filter', 420);
-  check(await has('category_favorites'), 'My apps opens the Browse sheet');
-  await shot('02-browse');
-  await tap('category_favorites', 520);
-  check(await text('home_title') === 'Favorites' && (await rows('apps').count()) === 3, 'Favorites filter shows 3 apps');
-  await tap('button_filter', 420);
-  await drag(240, 30, 240, 30, 1, 120);
-  await page.mouse.click((await screenBox()).x + 240 * ((await screenBox()).width / 480), (await screenBox()).y + 50);
-  await settle(420);
-  check(!(await page.evaluate(() => model.drawer)), 'tapping above the sheet closes it');
-  await tap('button_filter', 420);
-  await drag(240, 140, 240, 320, 8, 420);
-  check(!(await page.evaluate(() => model.drawer)), 'dragging the sheet down closes it');
-  await tap('button_filter', 420);
-  await tap('category_all', 520);
-
-  // 4. AI key: single press hint, double press quick switch, hold to open.
-  await ai(55, 520);
-  check((await toastText()).includes('Press AI twice'), 'single AI on Home shows the hint');
-  await page.evaluate(() => hideToast());
-  await aiDouble();
-  check(await has('switch_name'), 'AI ×2 opens quick switch');
-  const first = await text('switch_name');
-  await ai(55, 200);
-  const second = await text('switch_name');
-  check(first && second && first !== second, 'single AI in quick switch moves to the next app');
-  await shot('03-quick-switch');
-  await page.waitForTimeout(4300);
-  check(!(await has('switch_name')), 'quick switch closes after 4 s idle');
-  await aiDouble();
-  await ai(700, 400);
-  check(await view() === 'progress', 'holding AI in quick switch opens the app (switching progress)');
-  await page.waitForTimeout(3200);
-  check(await view() === 'result', 'install ends on the result page');
-  await shot('04-result-installed');
-  await page.waitForTimeout(4200);
-  check(['launching', 'running'].includes(await view()), 'countdown launches the app');
-  await reset();
-
-  // 5. Back: AI, Esc and edge swipe that follows the finger.
-  await tap('button_device');
-  check(await view() === 'device', 'device button opens Device');
+  // 3. Swipe between home and the Ideas pages: only the content moves; dots are tappable.
+  {
+    const b = await screenBox(), k = b.width / 480;
+    const nav0 = (await loc('nav_product').boundingBox()).x, dot0 = (await loc('pager_dot_0').boundingBox()).x;
+    const title0 = (await loc('home_title_a').boundingBox()).x;
+    await page.mouse.move(b.x + 400 * k, b.y + 130 * k);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(b.x + (400 - 25 * i) * k, b.y + 130 * k);
+    const nav1 = (await loc('nav_product').boundingBox()).x, dot1 = (await loc('pager_dot_0').boundingBox()).x;
+    const title1 = (await page.locator('#screen .pager-content [data-name="home_title_a"]').first().boundingBox()).x;
+    check(nav1 === nav0 && dot1 === dot0 && title1 < title0 - 50, 'while dragging, the status bar and dots stay put and only the content moves');
+    for (let i = 7; i <= 12; i++) await page.mouse.move(b.x + (400 - 25 * i) * k, b.y + 130 * k);
+    await page.mouse.up();
+    await settle(520);
+  }
+  check(await view() === 'ideas' && await mdl(() => cur().params.page) === 1, 'swipe left on Home opens Ideas page 1');
+  check(await has('button_idea_100001') && (await text('nav_badge')) === 'Ideas 1/4', 'the status bar names the page');
+  await page.waitForTimeout(2100);
+  check((await text('nav_badge')) === '', 'the page name clears after a moment');
+  check(await has('idea_ring_100001') && await has('idea_badge_100006'), 'current Idea has a ring and updatable Ideas a badge');
+  await shot('02-ideas-1');
+  await drag(100, 130, 400, 130, 8, 520);
+  check(await view() === 'home' && await text('nav_badge') === 'Home' && !(await has('pager_hint')), 'swipe right returns Home; the hint is gone for good');
+  await drag(120, 130, 150, 130, 6, 480);
+  check(await view() === 'home', 'a short swipe snaps back to Home');
+  await tap('pager_hit_2', 520);
+  check(await view() === 'ideas' && await mdl(() => cur().params.page) === 2, 'tapping the third dot opens Ideas page 2');
+  await tap('pager_hit_4', 520);
+  check(await has('button_add_idea') && await has('idea_add_visual') && await mdl(() => cur().params.page) === 4, 'last Ideas page ends with the big + cell');
+  await tap('button_add_idea', 400);
+  check(await view() === 'download' && await mdl(() => stack.map((e) => e.view).join()) === 'ideas,manage,download', '+ opens Download inside Manage');
   await ai();
-  await settle();
-  check(await view() === 'home', 'AI goes back immediately');
-  await tap('button_device');
+  check(await view() === 'manage', 'Back from there goes to Manage');
+  await reset();
+
+  // 4. AI key and sub-page chrome.
+  await tap('pager_hit_1', 520);
+  await ai();
+  check(await view() === 'home' && await mdl(() => model.page) === 0, 'AI on an Ideas page goes Home');
+  await blur();
+  await page.keyboard.down('ArrowUp');
+  await settle(60);
+  check(await page.locator('#keyFb.down').count() === 1, 'pressing AI lights the bar under the key at once');
+  await page.keyboard.up('ArrowUp');
+  await settle(150);
+  check((await page.locator('#keyFb .chip').textContent()) === 'Lock' && await mdl(() => !!model.sleeping), 'AI on Home turns the screen off; the chip says Lock');
+  check(await has('sleep_title_a') && await mdl(() => !model.wifi.connected), 'the screen-off view shows Make Ideas Run and Wi-Fi is off');
+  await shot('03-sleep');
+  await tap('button_wake', 300);
+  check(await mdl(() => !model.sleeping) && await view() === 'home', 'a tap wakes it');
+  await page.waitForTimeout(1400);
+  check(await mdl(() => model.wifi.connected), 'Wi-Fi reconnects after waking');
+  await tap('button_settings');
+  check(await view() === 'settings' && await text('settings_wifi') === 'Studio-5G', 'Settings opens and shows the Wi-Fi name');
+  check(await noStatusBar() && await has('button_back_settings'), 'sub-pages have no status bar, just Back and the title');
+  await shot('03-settings');
+  await ai();
+  check(await view() === 'home', 'AI on Settings goes back');
+  await tap('button_settings');
   await drag(6, 240, 40, 240, 6, 400);
-  check(await view() === 'device', 'short edge drag snaps back');
+  check(await view() === 'settings', 'short edge drag snaps back');
   await drag(6, 240, 220, 240, 10, 500);
   check(await view() === 'home', 'long edge drag goes back');
 
-  // 6. Detail: two pages, favorites, hold to delete.
-  await rows('apps').nth(1).click();
-  await settle();
-  check(await view() === 'detail' && await text('detail_title') === 'Weather Station', 'row opens detail');
-  check(await text('button_primary') === 'Open app', 'local app primary is Open app');
-  await shot('05-detail');
-  await tap('button_favorite', 200);
-  check((await toastText()).includes('Removed from Favorites'), 'star toggles favorite');
-  await drag(240, 300, 240, 160, 8, 450);
-  check(await page.evaluate(() => model.detail.page) === 2, 'swipe up opens About');
-  await drag(240, 200, 240, 360, 8, 450);
-  check(await page.evaluate(() => model.detail.page) === 1, 'swipe down returns to page 1');
-  await tap('button_more', 420);
-  check(await has('button_delete'), 'About this app opens page 2 with delete');
-  await shot('06-detail-about');
-  await hold('button_delete', 250);
-  check(await view() === 'detail', 'short hold does not delete');
-  await hold('button_delete', 760);
-  check(await view() === 'home' && !(await rowLabels('apps')).includes('Weather Station'), 'full hold deletes and returns Home');
-  check((await toastText()).includes('Deleted Weather Station'), 'delete toast');
-  await reset();
-
-  // 7. Download by ID: errors, lookup, download & open.
-  await tap('button_download');
-  await typeKeys('404040');
-  check(await text('id_digits') === '404040', 'typed digits show in the ID card');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1100);
-  check(await text('id_status_small') === 'No app with this ID', 'unknown ID error');
-  await shot('07-download-error');
-  await page.keyboard.press('Backspace');
-  check((await text('id_digits')).length === 5 || (await text('id_digits_small')).length === 5, 'backspace removes one digit');
-  await page.evaluate(() => { model.dl.digits = ''; render(0); });
-  await typeKeys('238114');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1300);
-  check(await view() === 'detail' && await text('button_primary') === 'Download & open', 'store app detail offers Download & open');
-  await tap('button_secondary', 500);
-  check(await view() === 'progress' && await has('button_cancel'), 'Save shows download progress with Cancel');
-  await shot('08-progress');
-  await tap('button_cancel', 420);
-  check(await view() === 'detail' && (await toastText()).includes('Download cancelled'), 'Cancel returns to detail');
-  await tap('button_secondary', 300);
-  await page.waitForTimeout(3800);
-  check(await view() === 'result' && await text('result_title') !== '', 'save ends on result');
-  await tap('button_result_right', 420);
-  check(await view() === 'download' || await view() === 'home', 'result Done returns');
-  await reset();
-
-  // 8. Offline lookup resumes after connecting (wrong password first).
-  await panel('simWifi');
-  await tap('button_download');
-  await typeKeys('238114');
-  await page.keyboard.press('Enter');
-  await settle(420);
-  check(await view() === 'wifi' && (await text('wifi_detail')).includes('238114'), 'offline lookup goes to Wi‑Fi with the pending task');
-  await shot('09-wifi-pending');
-  const nets = await rowLabels('networks');
-  await rows('networks').nth(nets.indexOf('Maker Lab')).click();
-  await settle();
-  check(await view() === 'password', 'secured network asks for the password');
-  await typeKeys('short');
-  await page.keyboard.press('Enter');
-  await settle(200);
-  check((await text('password_note')).includes('8 or more'), 'short password error');
-  await page.evaluate(() => { model.entry.text = ''; render(0); });
-  await typeKeys('wrongpass');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1400);
-  check((await text('password_note')).includes('Wrong password'), 'wrong password error');
-  await page.evaluate(() => { model.entry.text = ''; render(0); });
-  await typeKeys('maker2026');
-  await page.keyboard.press('Enter');
-  await settle(300);
-  check(await view() === 'password' && (await text('password_note')).includes('Connecting'), 'password page shows Connecting');
-  await page.waitForTimeout(3000);
-  check(await view() === 'detail' && await text('detail_title') === 'Retro Snake', 'lookup resumes after connecting');
-  await reset();
-
-  // 9. Background updates.
-  await tap('button_device');
-  const deviceRows = await page.locator('#screen [data-name^="button_device_"]').count();
-  check(deviceRows >= 6, 'Device lists its settings rows');
-  await page.evaluate(() => onAction('go:updates'));
-  await settle();
-  check((await rowLabels('updates')).length === 2, 'Updates lists 2 apps');
-  await tap('button_update_all', 300);
-  check((await text('updates_summary')).includes('in the background'), 'Update all runs in the background');
-  await shot('10-updates-running');
-  await ai(); await settle(); await ai(); await settle(500);
-  check(await view() === 'home' && (await text('status_badge')).startsWith('↓'), 'Home strip shows ↓ k/n');
-  await page.waitForFunction(() => !model.bg, null, { timeout: 12000 });
-  await settle(200);
-  const badge = await text('status_badge'), finished = await toastText();
-  check(badge === '' && finished.includes('Apps updated'), `updates finish with a toast (badge "${badge}", toast "${finished}")`);
-  await reset();
-
-  // 10. Storage full → Free up space → storage rows.
-  await panel('simStorage');
-  await tap('button_download');
-  await typeKeys('507219');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1200);
-  check(await text('button_primary') === 'Free up space', 'no space detail offers Free up space');
-  await tap('button_primary');
-  check(await view() === 'storage' && (await rows('storage').count()) === 20, 'Free up space opens App storage');
-  await shot('11-storage');
-  await rows('storage').nth(0).click();
-  await settle();
-  check(await view() === 'detail' && await page.evaluate(() => model.detail.page) === 2, 'storage row opens About with delete');
-  await reset();
-
-  // 11. Mosaico AI: hold to turn off, offline claim resumes.
-  await page.evaluate(() => { stack.push({ view: 'token', params: {} }); render(1); });
-  await settle();
-  await hold('button_turn_off', 760);
-  check(await page.evaluate(() => model.tokenKind) === 'none', 'hold turns Mosaico AI off');
-  await panel('simWifi');
-  await tap('button_claim');
-  check(await view() === 'wifi', 'offline Turn on goes to Wi‑Fi');
-  const nets2 = await rowLabels('networks');
-  await rows('networks').nth(nets2.indexOf('Espressif-Guest')).click();
-  await page.waitForTimeout(1800);
-  check(await page.evaluate(() => model.tokenKind) === 'mosaico' && await view() === 'token', 'claim resumes after connecting');
-  await reset();
-
-  // 12. Low battery blocks switching; USB deploy and return to Vibe Mode.
-  await panel('simLowBat');
-  await rows('apps').nth(1).click(); await settle();
-  await tap('button_primary', 420);
-  check(await view() === 'result' && await page.evaluate(() => model.result.kind) === 'battery', 'low battery blocks switching');
-  await reset();
-  await panel('simDeploy', 300);
-  check(await view() === 'progress', 'USB deploy shows progress');
-  await page.waitForTimeout(8800);
-  check(await view() === 'running', 'deployed app runs');
+  // 5. Tapping an Idea asks first; then launching and running.
+  await tap('pager_hit_1', 520);
+  await tap('button_idea_100001', 300);
+  check(await view() === 'ideas' && await text('confirm_title') === 'Open Pixel Pet?' && await text('confirm_key_ai_chip') === 'Hold AI' && await text('confirm_key_power_chip') === 'Press twice', 'tapping an Idea opens a confirm dialog with arrows at the AI and power keys');
+  {
+    const sb = await screenBox(), k = sb.width / 480;
+    const up = await loc('confirm_key_ai_arrow').boundingBox(), down = await loc('confirm_key_power_arrow').boundingBox();
+    check((up.y - sb.y) / k < 20 && (down.y - sb.y) / k > 440 && Math.abs((up.x - sb.x) / k + 12 - 372) < 2, 'the arrows sit on the top and bottom edges right under the keys');
+  }
+  await shot('03-confirm');
+  await tap('button_confirm_cancel', 300);
+  check(!(await page.locator('#screen .modal-layer.show').count()), 'Cancel closes the dialog');
+  await tap('button_idea_100001', 300);
+  await ai();
+  check(!(await page.locator('#screen .modal-layer.show').count()) && await view() === 'ideas', 'AI closes the dialog too');
+  await openTile('100001', 300);
+  check(await view() === 'launching' && (await text('launch_title')).includes('Pixel Pet'), 'Open goes to Launching');
+  await page.waitForTimeout(1700);
+  check(await view() === 'running', 'current Idea ends in Running');
   await blur();
   await page.keyboard.down('ArrowUp');
   await page.locator('#powerKey').dblclick();
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1300);
   await page.keyboard.up('ArrowUp');
   await settle();
   check(await view() === 'home', 'AI + double power returns to Vibe Mode');
   await reset();
 
-  // 13. Guide.
-  await panel('simGuide', 1300);
-  check(await view() === 'guide', 'first boot shows the guide');
-  for (let i = 0; i < 4; i++) await tap('button_guide_next', 380).catch(() => {});
-  check(await page.evaluate(() => cur().params.step) === 5, 'guide reaches step 5');
-  await shot('12-guide-5');
-  await tap('button_guide_wifi', 420);
-  check(await view() === 'wifi', 'Connect on step 5 opens Wi‑Fi');
+  // 6. Open another Idea: "Don't show again", Cancel window, then write and launch.
+  await tap('pager_hit_1', 520);
+  await tap('button_idea_100002', 300);
+  await tap('button_confirm_skip', 200);
+  check(await has('confirm_skip_check'), "Don't show this again can be ticked");
+  await tap('button_confirm_open', 400);
+  check(await view() === 'progress' && await has('button_cancel') && await noStatusBar(), 'another Idea shows Switching with Cancel and no status bar');
+  await tap('button_cancel', 420);
+  check(await view() === 'ideas' && await mdl(() => model.current) === '100001' && (await text('nav_badge')) === 'Cancelled', 'Cancel returns to the Ideas page and flashes Cancelled in the status bar');
+  await tap('button_idea_100002', 1900);
+  check(await view() === 'progress' && !(await has('button_cancel')), 'with the tick, the next tap skips the dialog; Cancel disappears once writing starts');
+  await page.waitForTimeout(2200);
+  check(await mdl(() => model.current) === '100002', 'switch sets the current Idea');
+  await reset();
+
+  // 7. Manage: order, scrollbar, the header update button.
+  await toManage();
+  let labels = await rowLabels('manage');
+  check(await view() === 'manage' && labels.length === 20, 'Manage lists 20 Ideas');
+  check(labels[0] === 'Pixel Pet' && labels[1] === 'Voice Notes' && labels[2] === 'Weather Station', 'current Idea first, then the ones with updates');
+  check((await text('manage_summary')).startsWith('20 Ideas'), 'Manage shows the count and storage use');
+  check(await text('button_update_all_badge') === '2' && !(await has('update_all_sub')), 'updates are a header button with a count, not a row');
+  check(await mdl(() => named(STATES.manage.objects, 'button_update_all_icon').image.includes('upgrade')), 'the update button uses the upward upgrade icon');
+  check(await loc('manage_scroll_thumb').isVisible(), 'the list shows a scrollbar');
+  const t0 = await loc('manage_scroll_thumb').evaluate((el) => el.offsetTop);
+  await page.evaluate(() => { const l = document.querySelector('#screen [data-list="manage"]'); l.scrollTop = 600; l.dispatchEvent(new Event('scroll')); });
+  await settle(100);
+  check(await loc('manage_scroll_thumb').evaluate((el) => el.offsetTop) > t0, 'the scrollbar thumb follows the list');
+  await page.evaluate(() => { const l = document.querySelector('#screen [data-list="manage"]'); l.scrollTop = 0; l.dispatchEvent(new Event('scroll')); });
+  await shot('04-manage');
+  await tap('button_update_all', 360);
+  check(await has('button_update_all_spinner'), 'the update button spins while updating');
+  check((await rowLabels('manage'))[1] === 'Voice Notes', 'updating rows stay in place');
+  await shot('05-manage-updating');
+  await page.waitForFunction(() => !model.bg, null, { timeout: 12000 });
+  await settle(200);
+  check(await text('toast_text') === 'Updated' && !(await has('button_update_all')), 'updates finish with an Updated toast and the button goes away');
+  await ai();
+  await tap('pager_hit_1', 520);
+  check(!(await has('idea_badge_100006')), 'update badges are gone from the Ideas page');
+  await reset();
+
+  // 8. Swipe to delete, Undo; the current Idea cannot be swiped away.
+  await toManage();
+  await swipeRow('manage', 3);
+  check(await page.locator('#screen .swipe-row.open').count() === 1, 'swiping a row left reveals Delete');
+  await shot('06-manage-swipe');
+  await openDelete().click();
+  await settle(360);
+  labels = await rowLabels('manage');
+  check(labels.length === 19 && !labels.includes('Lo-fi Clock'), 'Delete removes the Idea at once');
+  check(await text('toast_text') === 'Deleted Lo-fi Clock' && await has('button_undo'), 'the toast offers Undo');
+  await shot('07-manage-undo');
+  await tap('button_undo', 360);
+  labels = await rowLabels('manage');
+  check(labels.length === 20 && labels[3] === 'Lo-fi Clock', 'Undo puts it back in the same place');
+  await swipeRow('manage', 0);
+  check(await page.locator('#screen .swipe-row.open').count() === 0 && await text('toast_text') === "Can't delete the current Idea", 'the current Idea bounces back with a reason');
+  await swipeRow('manage', 1);
+  await rows('manage').nth(2).click();
+  await settle();
+  check(await view() === 'manage' && await page.locator('#screen .swipe-row.open').count() === 0, 'tapping elsewhere just closes the open row');
+  await reset();
+
+  // 9. Idea info: Open + Delete side by side, QR page with Back.
+  await toManage();
+  await rows('manage').nth(3).click();
+  await settle();
+  check(await view() === 'idea_info' && await text('info_title') === 'Lo-fi Clock', 'Manage row opens Idea info');
+  check(await has('button_open') && await has('button_delete') && !(await has('button_rename')), 'Open and Delete sit side by side; no Rename');
+  await tap('button_qr_idea', 420);
+  check(await view() === 'qr' && await has('qr_code') && (await text('qr_desc')).length > 20 && await has('button_back_qr'), 'QR page explains the code and has Back');
+  check(await loc('qr_code').evaluate((el) => el.getBoundingClientRect().width) < 260, 'the QR code is a modest size');
+  await shot('08-qr');
+  await tap('button_back_qr', 420);
+  check(await view() === 'idea_info', 'Back leaves the QR page');
+  await tap('button_delete', 300);
+  check(await view() === 'idea_info' && await text('toast_text') === 'Hold for 3 s to delete', 'a tap on Delete explains the 3 s hold');
+  {
+    const c = await center('button_delete'), openW = (await loc('button_open').boundingBox()).width;
+    await page.mouse.move(c.x, c.y);
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    const shrunk = (await loc('button_open').boundingBox()).width < openW * 0.6;
+    check(shrunk && await has('delete_popup_title') && (await text('button_delete')).startsWith('Keep holding'), 'holding: Open shrinks, Delete widens, a popup counts down');
+    await shot('09-delete-hold');
+    await page.mouse.up();
+    await settle(400);
+    check(await view() === 'idea_info' && await text('toast_text') === 'Not deleted' && !(await has('delete_popup_title')), 'letting go early cancels');
+  }
+  await hold('button_delete', 3300);
+  check(await view() === 'manage' && (await rowLabels('manage')).length === 19 && await text('toast_text') === 'Deleted Lo-fi Clock', 'a full 3 s hold deletes and returns to Manage');
+  await tap('button_undo', 360);
+  check((await rowLabels('manage')).length === 20, 'Undo restores it');
+  await rows('manage').nth(0).click();
+  await settle();
+  await tap('button_delete', 360);
+  check(await view() === 'idea_info' && await text('toast_text') === 'Open another Idea first', 'the current Idea\'s Delete is disabled and says why');
+  await reset();
+
+  // 10. Download by ID: slots, errors, lookup, download, cancel, save.
+  await toDownload();
+  check(await view() === 'download' && await has('key_5') && await noStatusBar(), 'Download shows the keypad, no status bar');
+  {
+    const c = await center('key_5'), n0 = await vib();
+    await page.mouse.move(c.x, c.y);
+    await page.mouse.down();
+    await settle(80);
+    const grown = await loc('key_5_visual').evaluate((el) => el.classList.contains('pressed') && el.dataset.grow === '1');
+    check(grown && await vib() === n0 + 1, 'a key grows and ticks on touch-down, before release');
+    await page.mouse.up();
+    await settle(120);
+    await mdl(() => { model.dl.digits = ''; render(0); });
+  }
+  await typeKeys('4040');
+  check(await bg('key_go_visual') !== 'rgb(255, 76, 1)', 'Go stays grey until six digits');
+  await typeKeys('40');
+  check(await bg('key_go_visual') === 'rgb(255, 76, 1)', 'Go turns orange with six digits');
+  await mdl(() => { model.dl.digits = ''; render(0); });
+  await typeKeys('404040');
+  check(await slots() === '404040', 'digits fill the six slots');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1100);
+  check(await text('id_status') === 'No Idea with this ID', 'unknown ID error');
+  await shot('09-download-error');
+  await page.keyboard.press('Backspace');
+  check(await slots() === '40404', 'backspace removes one digit');
+  await mdl(() => { model.dl.digits = ''; render(0); });
+  await tap('key_2', 60); await tap('key_3', 60); await tap('key_8', 60);
+  check(await slots() === '238', 'tapping keys fills the slots');
+  await typeKeys('114');
+  await tap('key_go', 1300);
+  check(await view() === 'idea_info' && await text('info_title') === 'Retro Snake' && await has('button_download'), 'lookup opens the store Idea with Download');
+  await tap('button_download', 400);
+  check(await view() === 'progress' && await has('button_cancel'), 'Download shows progress with Cancel');
+  await tap('button_cancel', 420);
+  check(await view() === 'idea_info' && await text('toast_text') === 'Cancelled', 'Cancel returns to Idea info with a toast');
+  await tap('button_download', 400);
+  await page.waitForTimeout(3900);
+  check(await view() === 'result' && await text('result_title') === 'Idea saved', 'download ends on Idea saved');
+  check(await mdl(() => window.__vib.some((p) => JSON.stringify(p) === JSON.stringify(T.haptics.success))), 'finishing a download gives the success haptic');
+  await tap('button_result_left', 420);
+  check(await view() === 'idea_info' && await has('button_open') && await mdl(() => model.ideas.length) === 21, 'Done returns to Idea info with the Idea installed');
+  await ai(); await ai(); await ai();
+  check(await view() === 'home', 'AI backs out of the stack to Home');
+  await tap('pager_hit_4', 520);
+  check(await has('idea_icon_238114'), 'the new Idea appears on the last Ideas page');
+  await reset();
+
+  // 11. Shared info: no Wi-Fi row, help, add, edit key and value, delete with Undo, swipe.
+  await mdl(() => localStorage.removeItem('vibe-shared-nvs'));
+  await tap('button_settings');
+  check(await text('settings_shared') === '3 entries', 'Settings shows 3 shared entries');
+  await tap('button_shared');
+  labels = await rowLabels('shared');
+  check(labels.join(',') === 'city,api_key,units' && !(await has('button_shared_wifi')), 'Shared info lists only the custom entries');
+  check(await brokenImgs() === 0 && await page.locator('#screen [data-list="shared"] [data-name="shared_icon"]').count() === 3, 'every Shared row shows its key / lock icon');
+  await shot('10-shared');
+  await tap('button_shared_help', 420);
+  check(await view() === 'shared_help' && (await text('shared_help_body')).startsWith('Shared info is'), '? explains what shared info is');
+  await ai();
+  await tap('button_add_entry', 420);
+  check(await view() === 'shared_add' && await has('shared_add_key_keyboard') && await kbGo() === '0', 'Add opens the key step with GO grey');
+  await typeKeys('C ');
+  check((await text('shared_add_key_display')) === 'c' && (await text('shared_add_key_note')).startsWith('Use a–z'), 'keys are lower-cased and only take a–z, 0–9 and _');
+  await mdl(() => { model.entry.text = ''; model.entry.error = ''; render(0); });
+  await typeKeys('color');
+  check(await kbGo() === '1', 'GO turns orange once a key is typed');
+  await page.keyboard.press('Enter');
+  await settle(420);
+  check(await has('shared_add_value_keyboard') && (await text('shared_add_value_note')).includes('color'), 'Go moves to the value step');
+  await typeKeys('blue');
+  await page.keyboard.press('Enter');
+  await settle(420);
+  check(await view() === 'shared' && (await rowLabels('shared')).includes('color') && await text('toast_text') === 'Saved', 'saving returns to the list with a Saved toast');
+  const stored = await mdl(() => JSON.parse(localStorage.getItem('vibe-shared-nvs')));
+  check(stored.some((e) => e.key === 'color' && e.value === 'blue'), 'the entry is written to localStorage');
+  check((await page.locator('#nvsDump').textContent()).includes('shared/color = "blue"'), 'the NVS panel shows the entry');
+  await rows('shared').nth((await rowLabels('shared')).indexOf('color')).click();
+  await settle(420);
+  check(await view() === 'shared_entry' && await text('entry_key') === 'color' && await text('entry_value') === 'blue', 'row opens the entry with Key and Value');
+  await tap('button_edit_value', 420);
+  await page.keyboard.press('Backspace');
+  await typeKeys('e');
+  await page.keyboard.press('Enter');
+  await settle(420);
+  check(await view() === 'shared_entry' && await text('entry_value') === 'blue', 'Edit value saves and returns to the entry');
+  await tap('button_edit_key', 420);
+  check(await text('shared_add_key_display') === 'color', 'Rename key starts from the current key');
+  await typeKeys('2');
+  await page.keyboard.press('Enter');
+  await settle(420);
+  check(await view() === 'shared_entry' && await text('shared_entry_title') === 'color2' && await text('entry_key') === 'color2', 'the key is renamed');
+  check((await page.locator('#nvsDump').textContent()).includes('shared/color2 = "blue"'), 'the NVS panel shows the new key');
+  await tap('button_delete_entry', 420);
+  check(await view() === 'shared' && !(await rowLabels('shared')).includes('color2') && await text('toast_text') === 'Deleted color2', 'Delete entry closes the page with Undo');
+  await tap('button_undo', 360);
+  check((await rowLabels('shared')).includes('color2'), 'Undo restores the entry');
+  await swipeRow('shared', (await rowLabels('shared')).indexOf('color2'));
+  await openDelete().click();
+  await settle(360);
+  check(!(await rowLabels('shared')).includes('color2') && !(await page.locator('#nvsDump').textContent()).includes('color2'), 'swipe Delete removes it from NVS');
+  await reset();
+
+  // 12. Offline: Home offers a red Wi-Fi alert; Download shows the offline page; a typed ID resumes after connecting.
+  await panel('simWifi');
+  check(await has('home_wifi_alert') && !(await has('home_intro')) && await loc('home_wifi_alert_text').evaluate((el) => getComputedStyle(el.querySelector('span')).color) === 'rgb(229, 72, 77)', 'offline Home shows a red Wi-Fi alert instead of the intro');
+  await tap('button_home_wifi', 400);
+  check(await view() === 'wifi', 'tapping the alert opens Wi-Fi');
+  await ai();
+  await toDownload();
+  check(await has('download_offline_title') && await has('button_connect_wifi'), 'offline Download shows Wi-Fi is off');
+  await reset();
+  await toDownload();
+  await typeKeys('238114');
+  await panel('simWifi', 300);
+  await blur();
+  await page.keyboard.press('Enter');
+  await settle(420);
+  check(await view() === 'wifi' && (await text('wifi_detail')).includes('238114'), 'offline lookup goes to Wi-Fi with the pending task');
+  await shot('11-wifi-pending');
+  check(await brokenImgs() === 0 && await page.locator('#screen [data-list="networks"] [data-name="networks_icon"]').count() > 0, 'Wi-Fi network rows show their signal icons');
+  const nets = await rowLabels('networks');
+  await rows('networks').nth(nets.indexOf('Maker Lab')).click();
+  await settle();
+  check(await view() === 'password', 'a secured network asks for the password');
+  await typeKeys('short');
+  check(await kbGo() === '0', 'password GO stays grey under 8 characters');
+  {
+    const g = await page.locator('#screen .kb-key[data-key="kb:go"]').last().boundingBox(), n0 = await vib();
+    await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+    await page.mouse.down();
+    const pattern = await mdl(() => window.__vib[window.__vib.length - 1]);
+    check(await vib() === n0 + 1 && pattern.length === 1 && pattern[0] > 8, 'pressing a grey GO gives the softer reject buzz');
+    await page.mouse.up();
+    await settle(200);
+  }
+  check((await text('password_note')).includes('8 or more'), 'short password error');
+  await mdl(() => { model.entry.text = ''; model.entry.error = ''; render(0); });
+  await typeKeys('wrongpass');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1700);
+  check((await text('password_note')).includes('Wrong password') && (await text('password_display')) === 'Type the password', 'wrong password clears the input and shows an error');
+  await typeKeys('maker2026');
+  check(await kbGo() === '1', 'password GO turns orange at 8 characters');
+  await page.keyboard.press('Enter');
+  await settle(300);
+  check(await view() === 'password' && (await text('password_note')).includes('Connecting'), 'password page shows Connecting');
+  await page.waitForTimeout(3300);
+  check(await view() === 'idea_info' && await text('info_title') === 'Retro Snake', 'lookup resumes after connecting');
+  await reset();
+
+  // 13. Low battery blocks switching.
+  await panel('simLowBat');
+  await tap('pager_hit_1', 520);
+  await openTile('100002', 420);
+  check(await view() === 'result' && await text('result_title') === 'Battery low', 'low battery blocks switching');
+  await tap('button_result_right', 420);
+  check(await view() === 'ideas', 'OK returns to the Ideas page');
+  await reset();
+
+  // 14. Settings: Help topic with QR, About, Develop, Wi-Fi forget.
+  await tap('button_settings');
+  await tap('button_help');
+  await tap('button_help_ids', 420);
+  check(await view() === 'help_topic' && await text('help_topic_title') === 'Idea IDs & sharing', 'Help topic opens');
+  await tap('button_help_qr', 420);
+  check(await view() === 'qr' && await text('qr_title') === 'Idea IDs & sharing' && await has('qr_url'), 'Show QR code opens the QR page');
+  await ai(); await ai(); await ai();
+  await tap('button_about', 420);
+  check(await view() === 'about' && (await text('about_version')) === 'v1.2' && (await text('about_storage')).startsWith('32.8'), 'About shows version and storage');
+  await ai(); await ai();
+  check(await view() === 'home', 'AI backs out to Home');
+  await tap('button_develop');
+  check(await view() === 'develop' && (await text('develop_status')).includes('Agent ready') && await brokenImgs() === 0, 'Develop shows USB and agent ready, all icons loaded');
+  await panel('simUsb');
+  check((await text('develop_status')).includes('Plug in'), 'Develop reflects USB unplugged');
+  await ai();
+  check(await loc('nav_usb').getAttribute('src') === await mdl(() => ASSETS['assets/icons/usb_off-20-grey.png']), 'unplugged USB shows a slashed icon like Wi-Fi off');
+  await tap('button_develop');
+  await tap('button_vibe_guide', 420);
+  check(await view() === 'qr' && await text('qr_title') === 'Vibe-coding guide', 'Develop links to the guide QR page');
+  await reset();
+  await tap('button_settings');
+  await tap('button_wifi');
+  await tap('button_wifi_current', 420);
+  await hold('button_forget', 1200);
+  check(await view() === 'wifi_network', 'a 1 s hold does not forget the network');
+  await hold('button_forget', 3300);
+  check(await view() === 'wifi' && await mdl(() => !model.wifi.connected), 'a full hold forgets the network');
+  await reset();
+
+  // 15. Screen off by timeout, wake by IMU; Display settings.
+  await panel('simIdle', 300);
+  check(await mdl(() => !!model.sleeping), 'the idle timeout turns the screen off');
+  await panel('simImu', 300);
+  check(await mdl(() => !model.sleeping), 'IMU motion wakes it');
+  await page.waitForTimeout(1400);
+  await tap('button_settings');
+  check((await text('settings_display')) === 'Screen off after 3 min' && await loc('settings_scroll_thumb').isVisible(), 'Settings scrolls and shows the screen-off time');
+  await tap('button_display');
+  check(await view() === 'display' && await bg('button_timeout_180') === 'rgb(242, 242, 242)', 'Display shows 3 min selected');
+  await shot('20-display');
+  await tap('button_timeout_600', 300);
+  check(await mdl(() => model.screenOff) === 600 && await text('toast_text') === 'Screen off after 10 min', 'picking 10 min saves it');
+  await tap('button_timeout_0', 300);
+  await panel('simIdle', 300);
+  check(await mdl(() => !model.sleeping), 'Never keeps the screen on');
+  await tap('button_rotate', 300);
+  check(await mdl(() => !model.autoRotate) && (await text('display_rotate_sub')).startsWith('Locked'), 'Auto-rotate switches off');
+  await reset();
+
+  // 16. IMU rotation: the device turns, the UI stays upright; it waits on keyboard pages.
+  await page.locator('#rotBtns [data-rot="90"]').click();
+  await settle(500);
+  let rot = await mdl(() => [document.getElementById('deviceRot').style.transform, screen.style.transform, keyFb.style.getPropertyValue('--chip-rot')]);
+  check(rot[0] === 'rotate(90deg)' && rot[1] === 'rotate(-90deg)' && rot[2] === 'rotate(-90deg)', 'turning the device 90° keeps the UI and the AI chip upright');
+  await tap('pager_hit_1', 520);
+  await tap('button_idea_100002', 300);
+  {
+    const sb = await screenBox(), k = sb.width / 480, up = await loc('confirm_key_ai_arrow').boundingBox();
+    check((up.x - sb.x) / k > 440 && !(await has('confirm_key_ai_chip')), 'rotated: the AI arrow moves to the right edge where the key now is');
+  }
+  await tap('button_confirm_cancel', 300);
+  await ai();
+  await shot('21-rotated');
+  await tap('button_settings');
+  check(await view() === 'settings', 'taps still land correctly when rotated');
+  await tap('button_shared');
+  await tap('button_add_entry', 420);
+  await page.locator('#rotBtns [data-rot="180"]').click();
+  await settle(300);
+  check(await mdl(() => screen.style.transform) === 'rotate(-90deg)', 'on a keyboard page the UI waits');
+  await ai();
+  check(await mdl(() => screen.style.transform) === 'rotate(-180deg)', 'leaving the keyboard applies the rotation');
+  await reset();
+  check(await mdl(() => screen.style.transform) === 'rotate(0deg)', 'reset turns the device upright');
+
+  // 17. Boot key: tip with QR; Boot + power twice → update mode; one press restarts.
+  await blur();
+  await page.keyboard.down('ArrowDown');
+  await settle(800);
+  check(await view() === 'boot_tip' && await has('boot_tip_qr') && (await text('boot_tip_body')).startsWith('Only needed'), 'holding Boot explains it is only for updating Vibe Mode, with a QR code');
+  await shot('22-boot-tip');
+  await page.keyboard.up('ArrowDown');
+  await tap('button_boot_tip_ok', 400);
+  check(await view() === 'home', 'Got it closes the tip');
+  await page.keyboard.down('ArrowDown');
+  await settle(200);
+  await page.locator('#powerKey').dblclick();
+  await settle(500);
+  await page.keyboard.up('ArrowDown');
+  check(await view() === 'update_mode' && await has('update_qr'), 'Boot held + power twice enters update mode');
+  await ai();
+  check(await view() === 'update_mode', 'AI does nothing in update mode');
+  await page.locator('#powerKey').click();
+  await page.waitForTimeout(2000);
+  check(await view() === 'home', 'one power press restarts into Vibe Mode');
+  await reset();
+
+  // 18. Agent install over USB.
+  await panel('simDeploy', 400);
+  check(await view() === 'progress' && !(await has('button_cancel')), 'USB deploy shows progress without Cancel');
+  await page.waitForTimeout(6800);
+  check(await view() === 'running' && await mdl(() => model.current) === '900001', 'deployed Idea runs');
+  check(await mdl(() => !ideaById('900001')), 'an agent install is not in NAND yet');
+  await blur();
+  await page.keyboard.down('ArrowUp');
+  await page.locator('#powerKey').dblclick();
+  await page.waitForTimeout(1300);
+  await page.keyboard.up('ArrowUp');
+  await settle();
+  await tap('pager_hit_1', 520);
+  await tap('button_idea_100002', 300);
+  check((await text('confirm_sub')).includes('Unsaved hello_world'), 'switching away warns that the unsaved build will be replaced');
+  await tap('button_confirm_cancel', 300);
+  await ai();
+  await tap('button_develop');
+  check((await text('develop_save_sub')).includes('hello_world · keep'), 'Develop offers Save to NAND flash');
+  await tap('button_save_nand', 400);
+  check(await view() === 'progress' && (await text('progress_title')) === 'Saving to NAND', 'saving shows the write progress');
+  await page.waitForTimeout(2200);
+  check(await view() === 'result' && await mdl(() => !!ideaById('900001')), 'saved: the Idea is now in NAND');
+  await tap('button_result_left', 420);
+  check((await text('develop_save_sub')) === 'hello_world is saved', 'Develop shows it is saved');
+  await reset();
 
   check(errors.length === 0, `no script errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
   console.log(`\n${pass} passed, ${fail} failed`);
