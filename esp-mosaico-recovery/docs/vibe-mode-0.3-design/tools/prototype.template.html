@@ -1,51 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vibe Mode 0.3 Prototype</title>
 <style>
-@font-face { font-family: "VibeDot"; src: url(data:font/ttf;base64,__FONT_DOT__) format("truetype"); font-weight: 400; }
+@font-face { font-family: "VibeDot"; src: url(data:font/ttf;base64,__FONT_DOT__) format("truetype"); font-weight: 600; }
 @font-face { font-family: "VibeSans"; src: url(data:font/ttf;base64,__FONT_SANS__) format("truetype"); font-weight: 400; }
 @font-face { font-family: "VibeSans"; src: url(data:font/ttf;base64,__FONT_MEDIUM__) format("truetype"); font-weight: 500; }
 
-/* Layout: the device on the left (the subject), a quiet control column on the
-   right, all screens below. The page stays dark so the cream device and its
-   black screen read like the product photo. */
+/* The device on the left, a quiet control column on the right, all screens
+   below. The page stays dark so the cream device reads like the product photo. */
 :root {
-  --page: #0a0a0a;
-  --panel: #131313;
-  --raised: #1c1c1c;
-  --line: #2a2a2a;
-  --text: #f2f2f2;
-  --muted: #9a9a9a;
-  --dim: #626262;
-  --accent: #ff4c01;
-  --cream: #e9e2d6;
-  --cream-edge: #c4bbac;
-  --key-grey: #cfcac2;
+  --page: #0a0a0a; --panel: #131313; --raised: #1c1c1c; --line: #2a2a2a;
+  --text: #f2f2f2; --muted: #9a9a9a; --dim: #626262; --accent: #ff4c01;
+  --cream: #e9e2d6; --cream-edge: #c4bbac; --key-grey: #cfcac2;
   --body: "VibeSans", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
   --dots: "VibeDot", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
 }
-html, body { background: var(--page); color: var(--text); }
+html, body { background: var(--page); color: var(--text); margin: 0; }
 body { font-family: var(--body); font-size: 15px; line-height: 1.55; }
 * { box-sizing: border-box; }
-.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: flex; flex-direction: column; gap: 36px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; display: flex; flex-direction: column; gap: 36px; }
 
 header.intro { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
 header.intro .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: center; }
 header.intro .eyebrow i { width: 8px; height: 8px; border-radius: 4px; background: var(--accent); display: inline-block; }
-header.intro h1 { font-family: var(--dots); font-weight: 400; font-size: clamp(34px, 6vw, 56px); line-height: 1; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+header.intro h1 { font-family: var(--dots); font-weight: 600; font-size: clamp(32px, 5.5vw, 52px); line-height: 1; margin: 0; letter-spacing: .02em; }
 header.intro p { margin: 0; color: var(--muted); max-width: 68ch; }
 
 .stage { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 32px; align-items: start; }
 @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } }
 
-.device-col { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.device-col { display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; position: sticky; top: 16px; }
+@media (max-width: 900px) { .device-col { position: static; } }
 .device-fit { width: 100%; display: flex; justify-content: center; }
 .device-scale { width: 560px; height: 616px; position: relative; flex: none; transform-origin: top center; }
-/* Cream body, black screen with large rounded corners (product photo). */
 .device { position: absolute; left: 16px; top: 44px; width: 528px; height: 528px; border-radius: 76px; background: var(--cream); z-index: 1;
   box-shadow: inset 0 0 0 2px var(--cream-edge), inset 0 -10px 24px rgba(0,0,0,.08), 0 30px 80px rgba(0,0,0,.55); }
-.screen { position: absolute; left: 24px; top: 24px; width: 480px; height: 480px; border-radius: 40px; overflow: hidden; background: #000; isolation: isolate;
-  box-shadow: 0 0 0 3px #1a1a1a; }
-/* Keys sit on the body edges: AI on the top edge at the right, two grey keys at the bottom. */
+.screen { position: absolute; left: 24px; top: 24px; width: 480px; height: 480px; border-radius: 60px; overflow: hidden; background: #000; isolation: isolate;
+  box-shadow: 0 0 0 3px #1a1a1a; touch-action: none; user-select: none; -webkit-user-select: none; }
 .hw { position: absolute; border: 0; cursor: pointer; padding: 0; touch-action: none; z-index: 2; width: 92px; height: 24px; }
 .hw:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .hw.ai { left: 366px; top: 32px; border-radius: 9px 9px 5px 5px; background: var(--accent); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18); }
@@ -56,48 +50,72 @@ header.intro p { margin: 0; color: var(--muted); max-width: 68ch; }
 .hw-label { position: absolute; font-size: 11px; color: var(--dim); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; }
 .hw-label.ai { left: 352px; top: 8px; width: 120px; text-align: center; color: var(--accent); }
 .hw-label.power { left: 342px; top: 590px; width: 140px; text-align: center; }
-.keys-hint { color: var(--dim); font-size: 13px; text-align: center; max-width: 520px; }
-.keys-hint kbd { font-family: var(--body); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; color: var(--muted); }
+.keys-hint { color: var(--dim); font-size: 13px; text-align: center; max-width: 520px; margin: 0; }
+kbd { font-family: var(--body); font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 1px 6px; color: var(--muted); }
 
 /* Screen objects: absolutely positioned GSP primitives from layout.json. Only
    buttons take input, as in GSP; text, images and containers pass taps through. */
 .layer { position: absolute; inset: 0; }
+.layer.page { background: #000; }
 .o { position: absolute; margin: 0; padding: 0; border: 0; background: none; color: inherit; }
 .o:not(button) { pointer-events: none; }
 .o-text { display: flex; align-items: center; pointer-events: none; }
 .o-text span { white-space: pre; display: block; }
-button.o { cursor: pointer; font: inherit; }
+button.o { cursor: pointer; font: inherit; transition: transform 90ms ease-out, filter 90ms ease-out; -webkit-tap-highlight-color: transparent; }
 button.o:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button.o:active::after, .row-hit:active::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(255,255,255,.08); }
-.o img, img.o { display: block; image-rendering: auto; }
-.list { position: absolute; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; }
+button.o:active { transform: scale(.97); }
+button.o:active::after, .row-hit:active::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: rgba(255,255,255,.1); }
+button.o[data-tone="light"]:active { filter: brightness(.82); }
+button.o[data-tone="light"]:active::after, button.o[data-hold]:active::after { content: none; }
+button.o[data-hold]:active { transform: none; }
+.o img, img.o { display: block; }
+.list { position: absolute; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; overscroll-behavior: contain; touch-action: pan-y; }
+/* Overlay layers (Browse sheet, quick switch card) pass taps through their
+   empty area to the scrim below; their own buttons still take input. */
+.layer[data-overlay] { pointer-events: none; }
+.layer[data-overlay] button { pointer-events: auto; }
 .list::-webkit-scrollbar { display: none; }
-.row-hit { position: absolute; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 16px; }
+.row-hit { position: absolute; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 18px; -webkit-tap-highlight-color: transparent; }
+.row-hit:active { transform: scale(.985); }
 .kb-key { position: absolute; border: 0; padding: 0; cursor: pointer; font-family: var(--body); color: #f2f2f2; display: flex; align-items: center; justify-content: center; }
 .kb-key:active { filter: brightness(1.35); }
+.kb-dim .kb-key { opacity: .45; pointer-events: none; }
+.hold-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: rgba(255,76,1,.38); pointer-events: none; }
+.key-magnifier { position: absolute; z-index: 20; width: 62px; height: 72px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center; background: #f2f2f2; color: #000;
+  font-family: var(--body); font-size: 28px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.5); pointer-events: none; }
+.toast-layer { pointer-events: none; z-index: 30; }
+.toast-hit { position: absolute; pointer-events: auto; cursor: pointer; border: 0; padding: 0; background: transparent; }
+.cue-layer { pointer-events: none; z-index: 40; }
 
 .panel { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.card h2 { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.card h2 { margin: 0; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; display: flex; justify-content: space-between; gap: 8px; }
+.card h2 span { letter-spacing: 0; text-transform: none; color: var(--dim); }
 .card p { margin: 0; color: var(--muted); }
-.legend { display: flex; flex-direction: column; gap: 10px; }
+.legend { display: flex; flex-direction: column; gap: 8px; }
 .legend div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-width: 0; }
 .pill { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 999px; background: var(--raised); color: var(--text); white-space: nowrap; }
 .btns { display: flex; flex-wrap: wrap; gap: 8px; }
-.btns button, .ids button { font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 1px solid #3a3a3a; border-radius: 999px; padding: 7px 14px; cursor: pointer; }
-.btns button:hover, .ids button:hover { border-color: var(--muted); }
+.btns button, .ids button, .linkbtn { font: inherit; font-size: 13px; color: var(--text); background: transparent; border: 1px solid #3a3a3a; border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+.btns button:hover, .ids button:hover, .linkbtn:hover { border-color: var(--muted); }
 .btns button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .btns button:focus-visible, .ids button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ids { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
-.ids button { font-family: var(--dots); font-size: 18px; letter-spacing: .04em; padding: 4px 12px; }
+.ids button { font-family: var(--dots); font-size: 16px; letter-spacing: .04em; padding: 4px 12px; }
 .ids span { color: var(--muted); font-size: 13px; }
 .status-line { font-size: 13px; color: var(--dim); min-height: 1.5em; }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.checks label { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; font-size: 13px; color: var(--muted); cursor: pointer; }
+.checks input { accent-color: var(--accent); margin: 3px 0 0; }
+.checks input:checked + span { color: var(--dim); text-decoration: line-through; }
+.checks b { color: var(--text); font-weight: 500; }
 
 .gallery h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 0 0 6px; }
 .gallery p { margin: 0 0 16px; color: var(--muted); max-width: 72ch; }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 18px 16px; }
 .thumb { display: flex; flex-direction: column; gap: 8px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: var(--muted); font: inherit; font-size: 13px; min-width: 0; }
-.thumb .mini { width: 168px; height: 168px; border-radius: 14px; overflow: hidden; position: relative; background: #000; box-shadow: 0 0 0 1px var(--line); }
+.thumb .mini { width: 168px; height: 168px; border-radius: 21px; overflow: hidden; position: relative; background: #000; box-shadow: 0 0 0 1px var(--line); }
 .thumb .mini .screen-static { position: absolute; left: 0; top: 0; width: 480px; height: 480px; transform: scale(.35); transform-origin: 0 0; }
 .thumb:hover .mini, .thumb:focus-visible .mini { box-shadow: 0 0 0 2px var(--accent); }
 .thumb:focus-visible { outline: none; }
@@ -111,9 +129,9 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
 
 <div class="wrap">
   <header class="intro">
-    <div class="eyebrow"><i></i>ESP-Mosaico · 阶段 A 界面设计评审 · 第 2 版</div>
+    <div class="eyebrow"><i></i>ESP-Mosaico · 阶段 A 界面设计评审 · 第 6 版</div>
     <h1>VIBE MODE 0.3</h1>
-    <p>可交互原型：按设备 480×480 屏幕绘制，与设计文档中的页面图使用同一份布局数据。所有数据都是示例；Mosaico Ideas 商店、Wi‑Fi、USB 和 AI Agent 均为模拟，不连接真实服务。</p>
+    <p>可交互原型：按设备 480×480 屏幕绘制，与设计文档中的页面图使用同一份布局数据。商店、Wi‑Fi、USB 和 AI Agent 都是模拟，不连接真实服务；右侧的“测试清单”列出了建议逐条验证的流程。</p>
   </header>
 
   <main class="stage">
@@ -121,7 +139,7 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
       <div class="device-fit" id="deviceFit">
         <div class="device-scale" id="deviceScale">
           <span class="hw-label ai">AI 键</span>
-          <button class="hw ai" id="aiKey" type="button" aria-label="AI 键：单击返回，双击快速切换，长按打开"></button>
+          <button class="hw ai" id="aiKey" type="button" aria-label="AI 键：单击返回，首页双击快速切换，切换中长按打开"></button>
           <div class="device" id="device">
             <div class="screen" id="screen" aria-live="polite"></div>
           </div>
@@ -131,18 +149,25 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
         </div>
       </div>
       <div class="static-bar" id="staticBar"><span id="staticName">静态页面</span><button type="button" id="staticExit">返回可交互原型</button></div>
-      <p class="keys-hint">触摸屏幕操作；点按右上角橙色 <kbd>AI</kbd> 键或键盘 <kbd>↑</kbd>：单击返回 · 双击快速切换 · 长按 1 秒打开。下载页可直接键入数字。</p>
+      <p class="keys-hint">鼠标即手指：点按、上下拖动列表、从屏幕左边缘向右拖动返回。键盘 <kbd>↑</kbd> 是 AI 键，<kbd>Esc</kbd> 返回；下载页和输入页可直接打字。</p>
     </section>
 
     <aside class="panel">
       <div class="card">
-        <h2>AI 键</h2>
+        <h2>按键与手势</h2>
         <div class="legend">
-          <div><span class="pill">AI</span><span>返回上一页；首页提示双击切换</span></div>
-          <div><span class="pill">AI ×2</span><span>快速切换当前列表（全部 / 收藏 / 分类）中的下一个应用</span></div>
-          <div><span class="pill">长按 AI</span><span>在快速切换中打开选中的应用</span></div>
-          <div><span class="pill">按住 AI + 双击右下开关机键</span><span>从正在运行的应用回到 Vibe Mode</span></div>
+          <div><span class="pill">AI</span><span>立即返回上一页；在首页单击会提示“按两次切换”（最多 3 次）</span></div>
+          <div><span class="pill">AI ×2</span><span>在首页打开快速切换，从当前应用的下一个开始</span></div>
+          <div><span class="pill">快速切换中</span><span>单击 AI 选下一个；按住 AI 0.6 秒打开；点卡片也能打开；4 秒无操作自动关闭</span></div>
+          <div><span class="pill">按住 AI + 双击开关机键</span><span>从正在运行的应用回到 Vibe Mode</span></div>
+          <div><span class="pill">左边缘右滑</span><span>返回；页面跟随手指，拖不够远会弹回</span></div>
+          <div><span class="pill">长按 0.6 秒</span><span>删除、忘记网络、关闭 Mosaico AI 等不可撤销操作</span></div>
         </div>
+      </div>
+      <div class="card">
+        <h2>测试清单 <span id="checkCount"></span></h2>
+        <ul class="checks" id="checks"></ul>
+        <div><button type="button" class="linkbtn" id="checksReset">清空勾选</button></div>
       </div>
       <div class="card">
         <h2>可试的应用编号</h2>
@@ -151,10 +176,13 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
       <div class="card">
         <h2>模拟</h2>
         <div class="btns">
-          <button type="button" id="simAgent" aria-pressed="true">AI Agent 已连接</button>
-          <button type="button" id="simUsb" aria-pressed="true">USB 数据线已插入</button>
-          <button type="button" id="simDeploy">Agent 部署一个应用</button>
           <button type="button" id="simWifi" aria-pressed="true">Wi‑Fi 已连接</button>
+          <button type="button" id="simUsb" aria-pressed="true">USB 数据线已插入</button>
+          <button type="button" id="simAgent" aria-pressed="true">AI Agent 已连接</button>
+          <button type="button" id="simFail" aria-pressed="false">下一次下载会失败</button>
+          <button type="button" id="simLowBat" aria-pressed="false">低电量</button>
+          <button type="button" id="simStorage" aria-pressed="false">存储空间不足</button>
+          <button type="button" id="simDeploy">Agent 通过 USB 安装应用</button>
           <button type="button" id="simGuide">首次进入（显示引导）</button>
           <button type="button" id="simReset">重置原型</button>
           <button type="button" id="simPhysical" aria-pressed="false">近似实物尺寸</button>
@@ -166,7 +194,7 @@ button.o:active::after, .row-hit:active::after { content: ""; position: absolute
 
   <section class="gallery">
     <h2>全部页面</h2>
-    <p id="galleryNote">设计文档中的全部页面状态。点开可在设备中查看静态页面，再点“返回可交互原型”继续操作。</p>
+    <p id="galleryNote"></p>
     <div class="thumbs" id="thumbs"></div>
   </section>
 </div>
@@ -180,83 +208,87 @@ const T = LAYOUT.tokens;
 const C = T.colors;
 const LH = T.line_height_em;
 const P = LAYOUT.prototype;
+const I = P.interactions;
 const FAMILY = { dot: "VibeDot", sans: "VibeSans", medium: "VibeSans" };
-const WEIGHT = { dot: 400, sans: 400, medium: 500 };
+const WEIGHT = { dot: 600, sans: 400, medium: 500 };
 const STATES = {};
 for (const s of LAYOUT.states.concat(P.states)) STATES[s.id] = s;
 const ROWS = P.row_templates;
 const ROW_H = P.row_heights;
 const CAT_LABEL = Object.fromEntries(P.categories.map((c) => [c.id, c.label]));
-const SLIDE = T.motion.page_slide_px, SLIDE_MS = T.motion.page_slide_ms;
-const DOUBLE_MS = 350, LONG_MS = 1000, TOAST_MS = 1500;
+const EASE = I.page_easing, SLIDE = T.motion.page_slide_px, SLIDE_MS = I.page_ms;
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const asset = (path) => ASSETS[path] || "";
 const iconPath = (name, size, color) => `assets/icons/${name}-${size}-${color}.png`;
 const catLabel = (id) => CAT_LABEL[id] || "Other";
+const tileKey = (a) => (CAT_LABEL[a.category] || a.category === "community") ? a.category : "other";
+const tilePath = (a, size) => `assets/mosaic/tile_${tileKey(a)}-${size}.png`;
+const sizeMB = (a) => parseFloat(a.size) || 0;
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------------- Sample model (examples only) ---------------- */
 const STORE = {};
 for (const a of P.apps) STORE[a.id] = Object.assign(clone(a), P.store_updates[a.id] ? { version: P.store_updates[a.id] } : {});
 for (const a of P.store_only) STORE[a.id] = clone(a);
 const TRY_IDS = [
-  ["238114", "社区应用，本机没有 → 下载"],
-  ["100006", "本机 v1.0.0，商店 v1.1.0 → 更新"],
-  ["100009", "本机已有最新版"],
+  ["238114", "社区应用，本机没有：下载并打开"],
+  ["507219", "社区应用：可试“只保存”，或配合“存储空间不足”"],
+  ["100006", "本机 v1.0.0，商店 v1.1.0：更新"],
+  ["100009", "本机已有：直接进入详情"],
   ["404040", "编号不存在"],
   ["500500", "商店繁忙"],
   ["666666", "不兼容此设备"],
 ];
-const NETWORKS = [
-  { ssid: "Studio-5G", secured: true, signal: "Strong" },
-  { ssid: "Maker Lab", secured: true, signal: "Good" },
-  { ssid: "Espressif-Guest", secured: false, signal: "Good" },
-  { ssid: "Home-2.4G", secured: true, signal: "Weak" },
-  { ssid: "Cafe Corner", secured: true, signal: "Weak" },
-];
 const ENTRY = {
-  password: { limit: 64, placeholder: "Type the password", note: "Or set it from your computer." },
-  city_input: { limit: 40, placeholder: "Type your city", note: "Letters and spaces, up to 40." },
-  token_input: { limit: 128, placeholder: "Type your token", note: "Every app can read it." },
+  password: { limit: 64, placeholder: "Type the password", secret: true },
+  city_input: { limit: 40, placeholder: "Type your city", secret: false },
+  own_key: { limit: 128, placeholder: "Paste or type your key", secret: true },
 };
 function freshModel() {
   return {
     apps: clone(P.apps),
     favorites: new Set(P.favorites),
-    current: P.current,         // app installed in ota_0, if it is in the library
-    filter: "all",              // all | favorites | a category id
-    running: null,
-    agent: true,
-    usb: true,
-    wifi: { connected: true, ssid: "Studio-5G", ip: "192.168.1.20" },
+    recent: [...P.recent],
+    current: P.current,
+    storeUpdates: clone(P.store_updates),
+    filter: "all",
+    drawer: false,
+    agent: true, usb: true,
+    wifi: { connected: true, ssid: "Studio-5G", ip: "192.168.1.20", connecting: "" },
     city: "Shanghai",
-    token: P.ai_token,
+    tokenKind: P.ai_token_kind, token: P.ai_token, aiOptOut: false,
     guideDone: true,
-    dl: { digits: "", looking: false },
-    detail: null,               // { mode, app }
-    deleteArmed: false,
-    progress: null,
-    result: null,
-    pendingLookup: false,
-    password: { ssid: "" },
-    entry: { text: "", visible: false, error: "" },   // draft of the open keyboard page
-    qs: null,                   // quick switch { index }
+    dl: { digits: "", looking: false, error: "" },
+    detail: null,            // { id, mode, page }
+    progress: null, result: null,
+    pending: null,           // task resumed after Wi-Fi connects: { kind, ... }
+    bg: null,                // background updates { ids, i, pct, paused }
+    entry: { text: "", visible: false, error: "" },
+    passwordFor: "",
+    passwordState: "typing",
+    qs: null,
     scanning: false,
+    lowBattery: false, storageFull: false, failNext: false,
+    aiHints: 0, aiDoubleUsed: false,
+    pairingVisible: false,
   };
 }
 let model = freshModel();
+const appById = (id) => model.apps.find((a) => a.id === id);
+const updateIds = () => Object.keys(model.storeUpdates).filter((id) => appById(id) && appById(id).version !== model.storeUpdates[id]);
+const usedMB = () => model.storageFull ? P.nand_capacity_mb - 0.4 : model.apps.reduce((s, a) => s + sizeMB(a), 0);
+const freeMB = () => Math.max(0, P.nand_capacity_mb - usedMB());
 
-/* ---------------- Rendering ---------------- */
+/* ---------------- Rendering (GSP primitives) ---------------- */
 const screen = document.getElementById("screen");
 let staticMode = false;
-
-function px(v) { return `${v}px`; }
+const px = (v) => `${v}px`;
 function hex(c, a) {
   if (a === undefined || a >= 255) return c;
   const n = parseInt(c.slice(1), 16);
   return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${(a / 255).toFixed(3)})`;
 }
-
 function textNode(o, text, align, offset) {
   const s = document.createElement("span");
   s.textContent = text;
@@ -266,7 +298,7 @@ function textNode(o, text, align, offset) {
   s.style.lineHeight = px(LH[o.font] * o.size);
   s.style.color = o.color;
   s.style.textAlign = align;
-  if (offset || o.text_dy) s.style.transform = `translate(${offset || 0}px, ${o.text_dy || 0}px)`;
+  if (offset) s.style.transform = `translateX(${offset}px)`;
   if (o.wrap) {
     s.style.whiteSpace = "normal"; s.style.display = "-webkit-box"; s.style.webkitBoxOrient = "vertical";
     s.style.webkitLineClamp = String(Math.max(1, Math.floor(o.h / (LH[o.font] * o.size)))); s.style.overflow = "hidden";
@@ -276,19 +308,43 @@ function textNode(o, text, align, offset) {
   return s;
 }
 
+function holdHandlers(n, o, onAction, span) {
+  const fill = document.createElement("span");
+  fill.className = "hold-fill";
+  n.prepend(fill);
+  n.dataset.hold = "1";
+  let timer = 0, done = false;
+  const ms = o.hold_ms || I.danger_hold_ms;
+  const reset = () => {
+    clearTimeout(timer);
+    if (done) return;
+    fill.style.transition = "width 160ms ease-out"; fill.style.width = "0";
+    if (span) span.textContent = o.text;
+  };
+  n.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); done = false;
+    try { n.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
+    fill.style.transition = "none"; fill.style.width = "0"; void fill.offsetWidth;
+    fill.style.transition = `width ${ms}ms linear`; fill.style.width = "100%";
+    if (span) span.textContent = "Keep holding…";
+    timer = setTimeout(() => { done = true; onAction(o.action); }, ms);
+  });
+  n.addEventListener("pointerup", reset);
+  n.addEventListener("pointercancel", reset);
+  n.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); if (!done) toast("Hold to confirm"); });
+}
+
 function renderObj(o, onAction, dx = 0, dy = 0) {
   let n;
   const interactive = o.type === "button" && o.action && onAction;
   if (o.type === "image") {
     n = document.createElement("img");
-    n.src = asset(o.image);
-    n.alt = "";
+    n.src = asset(o.image); n.alt = "";
     if (o.qr) n.style.imageRendering = "pixelated";
   } else if (interactive) {
     n = document.createElement("button");
     n.type = "button";
-    n.setAttribute("aria-label", o.text || (o.icon ? o.icon.image.split("/").pop().split("-")[0] : o.name || "button"));
-    n.addEventListener("click", (e) => { e.stopPropagation(); onAction(o.action); });
+    n.setAttribute("aria-label", o.text || o.name || "button");
   } else {
     n = document.createElement("div");
   }
@@ -299,6 +355,7 @@ function renderObj(o, onAction, dx = 0, dy = 0) {
   if (o.bg) n.style.background = hex(o.bg, o.opacity);
   if (o.radius) n.style.borderRadius = px(o.radius);
   if (o.border && o.border_width) n.style.boxShadow = `inset 0 0 0 ${o.border_width}px ${o.border}`;
+  let span = null;
   if (o.type === "label" || (o.type === "button" && o.text)) {
     const holder = o.type === "label" ? n : document.createElement("div");
     holder.classList.add("o-text");
@@ -306,28 +363,41 @@ function renderObj(o, onAction, dx = 0, dy = 0) {
     const align = o.type === "button" ? "center" : o.align;
     holder.style.justifyContent = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
     if (o.wrap) holder.style.alignItems = "flex-start";
-    holder.appendChild(textNode(o, o.text, align, o.text_offset || 0));
+    span = textNode(o, o.text, align, o.text_offset || 0);
+    holder.appendChild(span);
   }
   if (o.type === "button" && o.icon) {
     const img = document.createElement("img");
     img.src = asset(o.icon.image); img.alt = "";
-    img.style.position = "absolute";
-    img.style.left = px(o.icon.x - o.x); img.style.top = px(o.icon.y - o.y);
-    img.style.width = px(o.icon.w); img.style.height = px(o.icon.h);
-    img.style.pointerEvents = "none";
+    Object.assign(img.style, { position: "absolute", left: px(o.icon.x - o.x), top: px(o.icon.y - o.y),
+      width: px(o.icon.w), height: px(o.icon.h), pointerEvents: "none" });
+    if (o.name) img.dataset.name = `${o.name}_img`;
     n.appendChild(img);
   }
+  if (interactive) {
+    if (o.action.startsWith("hold:")) holdHandlers(n, o, onAction, span);
+    else n.addEventListener("click", (e) => { e.stopPropagation(); if (!gestureEatsClick()) onAction(o.action, n); });
+    if (o.bg === C.primary_bg || o.bg === C.accent) n.dataset.tone = "light";
+    if (o.name === "key_del") longPress(n, () => onAction("key:clear"));
+  }
   if (o.type === "progress") {
-    n.style.background = o.bg; n.style.borderRadius = px(o.radius); n.style.overflow = "hidden";
+    Object.assign(n.style, { background: o.bg, borderRadius: px(o.radius), overflow: "hidden" });
     const f = document.createElement("div");
-    f.style.position = "absolute"; f.style.left = "0"; f.style.top = "0"; f.style.bottom = "0";
-    f.style.width = `${Math.max(0, Math.min(100, o.value))}%`;
-    f.style.background = o.fg; f.style.borderRadius = px(o.radius);
+    Object.assign(f.style, { position: "absolute", left: "0", top: "0", bottom: "0",
+      width: `${Math.max(0, Math.min(100, o.value))}%`, background: o.fg, borderRadius: px(o.radius) });
     f.dataset.fill = "1";
     n.appendChild(f);
   }
   if (o.type === "keyboard") { n.style.pointerEvents = "auto"; renderKeyboard(n, o, onAction); }
   return n;
+}
+// Long press on a key (backspace clears); a short tap still reaches the click handler.
+function longPress(el, fn) {
+  let t = 0;
+  el.addEventListener("pointerdown", () => { el._long = false; t = setTimeout(() => { el._long = true; fn(); }, I.backspace_clear_ms); });
+  const stop = () => clearTimeout(t);
+  el.addEventListener("pointerup", stop); el.addEventListener("pointercancel", stop); el.addEventListener("pointerleave", stop);
+  el.addEventListener("click", (e) => { if (el._long) { e.stopImmediatePropagation(); el._long = false; } }, true);
 }
 
 const KB_ROWS = { lower: ["qwertyuiop", "asdfghjkl", "zxcvbnm"], upper: ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"],
@@ -338,51 +408,75 @@ function renderKeyboard(n, kb, onAction) {
   const keyH = 50, pitch = 59;
   const key = (x, y, w, label, color, action, opts = {}) => {
     const b = document.createElement(onAction ? "button" : "div");
-    if (onAction) { b.type = "button"; b.addEventListener("click", (e) => { e.stopPropagation(); onAction(action); }); }
+    if (onAction) {
+      b.type = "button";
+      let magnifier = null;
+      b.addEventListener("click", (e) => { e.stopPropagation(); onAction(action); });
+      b.addEventListener("pointerdown", () => {
+        if (label.length === 1) {
+          magnifier = document.createElement("span");
+          magnifier.className = "key-magnifier";
+          magnifier.textContent = label;
+          magnifier.style.left = px(Math.max(4, Math.min(414, x + w / 2 - 31)));
+          magnifier.style.top = px(Math.max(-54, y - 58));
+          n.appendChild(magnifier);
+        }
+      });
+      const release = () => { if (magnifier) magnifier.remove(); magnifier = null; };
+      b.addEventListener("pointerup", release); b.addEventListener("pointercancel", release); b.addEventListener("pointerleave", release);
+      if (action === "kb:del") longPress(b, () => onAction("kb:clear"));
+    }
     b.className = "kb-key";
-    b.style.left = px(x); b.style.top = px(y); b.style.width = px(w); b.style.height = px(keyH);
-    b.style.background = color; b.style.borderRadius = px(kb.key_radius);
-    b.style.fontSize = px(opts.size || kb.font_size); b.style.fontWeight = WEIGHT[kb.font] || 500;
+    Object.assign(b.style, { left: px(x), top: px(y), width: px(w), height: px(keyH), background: color,
+      borderRadius: px(kb.key_radius), fontSize: px(opts.size || kb.font_size), fontWeight: WEIGHT[kb.font] || 500 });
     if (opts.color) b.style.color = opts.color;
-    if (opts.icon) { const i = document.createElement("img"); i.src = asset(opts.icon); i.alt = ""; if (opts.rotate) i.style.transform = `rotate(${opts.rotate}deg)`; b.appendChild(i); b.setAttribute("aria-label", opts.aria || label); }
-    else b.textContent = label;
+    if (opts.icon) {
+      const i = document.createElement("img"); i.src = asset(opts.icon); i.alt = "";
+      if (opts.rotate) i.style.transform = `rotate(${opts.rotate}deg)`;
+      b.appendChild(i); b.setAttribute("aria-label", opts.aria || label);
+    } else b.textContent = label;
     n.appendChild(b);
   };
   KB_ROWS[kbMode].forEach((chars, r) => {
     const count = chars.length, kw = 42, gap = 5.6;
-    const width = count * kw + (count - 1) * gap;
-    const start = r < 2 ? (480 - width) / 2 : 72;
+    const start = r < 2 ? (480 - (count * kw + (count - 1) * gap)) / 2 : 72;
     [...chars].forEach((ch, i) => key(start + i * (kw + gap), 4 + r * pitch, kw, ch, kb.key_color, `kb:${ch}`));
   });
   const y3 = 4 + 2 * pitch, y4 = 4 + 3 * pitch;
   key(8, y3, 56, "shift", kbMode === "upper" ? "#3a3a3a" : kb.function_color, "kb:shift", { icon: iconPath("back", 28, "white"), rotate: 90, aria: "Shift" });
   key(416, y3, 56, "delete", kb.function_color, "kb:del", { icon: iconPath("backspace", 28, "white"), aria: "Delete" });
-  key(8, y4, 88, kbMode === "sym" ? "ABC" : "123", kb.function_color, "kb:sym", { size: kb.function_font_size });
+  key(16, y4, 80, kbMode === "sym" ? "ABC" : "123", kb.function_color, "kb:sym", { size: kb.function_font_size });
   key(104, y4, 272, "space", kb.key_color, "kb: ", { size: kb.function_font_size });
-  key(384, y4, 88, "GO", kb.ok_color, "kb:go", { size: kb.function_font_size, color: kb.ok_text_color });
+  key(384, y4, 80, "GO", kb.ok_color, "kb:go", { size: kb.function_font_size, color: kb.ok_text_color });
 }
 
+const ROW_LABEL = { apps: "apps_name", networks: "networks_title", updates: "updates_name", storage: "storage_name" };
 function renderList(root, vp, kind, items, onAction) {
   const list = document.createElement("div");
-  list.className = "list";
-  list.style.left = px(vp.x); list.style.top = px(vp.y); list.style.width = px(vp.w); list.style.height = px(vp.h);
+  list.className = "list"; list.dataset.list = kind;
+  Object.assign(list.style, { left: px(vp.x), top: px(vp.y), width: px(vp.w), height: px(vp.h) });
+  list.addEventListener("scroll", () => updateFade(list), { passive: true });
   const content = document.createElement("div");
   content.style.position = "relative";
-  content.style.height = px(items.length * ROW_H[kind]);
+  content.style.height = px(Math.max(0, items.length * ROW_H[kind] - 8));
   items.forEach((values, i) => {
     const y = i * ROW_H[kind];
     for (const o of ROWS[`${kind}_row`]) {
       const obj = clone(o);
-      delete obj.clip;
-      if (obj.name && values[obj.name] !== undefined) obj.text = values[obj.name];
+      if (obj.name && values[obj.name] !== undefined) {
+        if (obj.type === "image") obj.image = values[obj.name];
+        else obj.text = values[obj.name];
+      }
+      if (obj.name && values[`${obj.name}:color`]) obj.color = values[`${obj.name}:color`];
       content.appendChild(renderObj(obj, null, 0, y));
     }
     if (onAction) {
       const hit = document.createElement("button");
       hit.type = "button"; hit.className = "row-hit";
-      hit.style.left = "0"; hit.style.top = px(y); hit.style.width = px(vp.w); hit.style.height = px(88);
-      hit.setAttribute("aria-label", values[kind === "apps" ? "apps_name" : "networks_title"]);
-      hit.addEventListener("click", () => onAction(`row:${kind}:${i}`));
+      Object.assign(hit.style, { left: "0", top: px(y), width: px(vp.w), height: px(ROW_H[kind] - 8) });
+      hit.setAttribute("aria-label", values[ROW_LABEL[kind]] || kind);
+      hit.dataset.row = `${kind}:${i}`;
+      hit.addEventListener("click", () => { if (!gestureEatsClick()) onAction(`row:${kind}:${i}`); });
       content.appendChild(hit);
     }
   });
@@ -394,9 +488,18 @@ function buildLayer(objs, lists, onAction) {
   const layer = document.createElement("div");
   layer.className = "layer";
   for (const o of objs) {
-    if (o.visible === false) continue;
     if (o.type === "list_viewport") {
-      if (lists && lists[o.name]) renderList(layer, o, o.name, lists[o.name], onAction);
+      if (lists && lists[o.name]) { renderList(layer, o, o.name, lists[o.name], onAction); continue; }
+      // Fixed rows (Device, Help): one scroll container with absolute content.
+      const rows = objs.filter((row) => row.row_of === o.name);
+      const list = document.createElement("div");
+      list.className = "list"; list.dataset.list = o.name;
+      Object.assign(list.style, { left: px(o.x), top: px(o.y), width: px(o.w), height: px(o.h) });
+      const content = document.createElement("div");
+      content.style.position = "relative";
+      content.style.height = px(Math.max(o.h, ...rows.map((row) => row.y + row.h - o.y + 16)));
+      for (const row of rows) content.appendChild(renderObj(row, onAction, -o.x, -o.y));
+      list.appendChild(content); layer.appendChild(list);
       continue;
     }
     if (o.row_of) continue;
@@ -407,133 +510,139 @@ function buildLayer(objs, lists, onAction) {
 
 /* ---------------- Views ---------------- */
 const named = (objs, name) => objs.find((o) => o.name === name);
-function setText(objs, name, text) { const o = named(objs, name); if (o) o.text = text; return o; }
+function setText(objs, name, text, color) {
+  const o = named(objs, name);
+  if (o) { o.text = text; if (color) o.color = color; }
+  return o;
+}
 function setImage(objs, name, image) {
   const o = named(objs, name);
   if (o && o.type === "image") o.image = image;
   else if (o && o.icon) o.icon.image = image;
 }
-function without(objs, names) { return objs.filter((o) => !names.includes(o.name)); }
-function tpl(id) { return clone(STATES[id].objects).filter((o) => o.name !== "ai_cue"); }
-function initial(name) { return (name || "?").trim().charAt(0).toUpperCase(); }
+function tpl(id) { return clone(STATES[id].objects); }
+// Objects from the first scrim on: the overlay part of a state (sheet, quick switch).
+function overlayOf(id) {
+  const objs = tpl(id);
+  return objs.slice(objs.findIndex((o) => o.role === "scrim"));
+}
 function sortedApps() {
-  return [...model.apps].sort((a, b) => (b.official - a.official) ||
-    (a.id.length - b.id.length) || a.id.localeCompare(b.id));
+  const rank = (a) => a.id === model.current ? -1 : model.recent.includes(a.id) ? model.recent.indexOf(a.id) : 1000 + Number(a.id);
+  return [...model.apps].sort((a, b) => rank(a) - rank(b));
 }
 function filteredApps(flt = model.filter) {
   const apps = sortedApps();
   if (flt === "all") return apps;
+  if (flt === "recent") return apps.filter((a) => a.id === model.current || model.recent.includes(a.id));
   if (flt === "favorites") return apps.filter((a) => model.favorites.has(a.id));
   return apps.filter((a) => a.category === flt);
 }
-const appById = (id) => model.apps.find((a) => a.id === id);
-const sizeMB = (a) => parseFloat(a.size) || 0;
+const rowDetail = (a) => a.official ? catLabel(a.category) : `${catLabel(a.category)} · Community`;
 
+function badgeText() {
+  if (model.bg) return model.bg.paused ? "↓ Paused" : `↓ ${model.bg.i + 1}/${model.bg.ids.length}`;
+  const n = updateIds().length;
+  return n ? `↑ ${n}` : " ";
+}
 function statusIcons(objs) {
   setImage(objs, "status_wifi", model.wifi.connected ? iconPath("wifi", 28, "white") : iconPath("wifi_off", 28, "grey"));
   setImage(objs, "status_agent", iconPath("robot", 28, model.agent ? "orange" : "grey"));
-  setImage(objs, "status_battery", iconPath("battery_mid", 28, "white"));
+  setImage(objs, "status_battery", model.lowBattery ? iconPath("battery_low", 28, "orange") : iconPath("battery_mid", 28, "white"));
+  setText(objs, "status_badge", badgeText());
 }
 
-function rowDetail(a) { return a.official ? `${catLabel(a.category)} · ${a.id}` : `Community app · ${a.id}`; }
-function facts(a) { return `${catLabel(a.category)} · ${a.official ? "Official" : "Community"} · v${a.version} · ${a.size}`; }
-
 function homeView() {
-  const flt = model.filter;
-  const apps = filteredApps();
-  const kind = flt === "all" ? "" : flt === "favorites" ? "-favorites" : "-category";
-  const objs = tpl(apps.length ? `home${kind}` : `home${kind}-empty`);
+  const flt = model.filter, apps = filteredApps();
+  const id = apps.length ? "home" : flt === "all" ? "home-empty" : flt === "favorites" ? "home-favorites-empty" : "home-category-empty";
+  const objs = tpl(id);
   statusIcons(objs);
   setText(objs, "home_title", P.filter_labels[flt] || catLabel(flt));
   const rows = apps.map((a) => {
-    const current = model.current === a.id;
-    return { apps_initial: initial(a.name), apps_star: model.favorites.has(a.id) ? "★" : " ", apps_name: a.name,
-             apps_detail: current ? " " : rowDetail(a), apps_detail_current: current ? "● Current app" : " " };
+    const current = a.id === model.current, update = updateIds().includes(a.id);
+    return { apps_tile: tilePath(a, 56), apps_name: a.name,
+             apps_detail: current || update ? " " : rowDetail(a),
+             apps_detail_hi: current ? "Current app" : update ? "↑ Update available" : " ",
+             apps_star: model.favorites.has(a.id) ? iconPath("star_fill", 20, "grey") : "assets/ui/blank-20.png" };
   });
-  return { objs, lists: { apps: rows } };
+  let overlay = null;
+  if (model.drawer) {
+    overlay = overlayOf("browse");
+    for (const b of P.browse) {
+      const btn = named(overlay, `category_${b.id}`), active = b.id === flt;
+      if (btn) { btn.border = active ? C.accent : null; btn.border_width = active ? 3 : 0; }
+      setImage(overlay, `category_${b.id}_icon`, iconPath(b.icon, 32, active ? "orange" : "white"));
+      setText(overlay, `category_${b.id}_count`, String(filteredApps(b.id).length));
+    }
+  }
+  if (model.qs) overlay = quickSwitchObjs();
+  return { objs, lists: { apps: rows }, overlay };
 }
 
 function quickSwitchObjs() {
-  const objs = clone(STATES["quick-switch"].objects);
-  const start = objs.findIndex((o) => o.role === "scrim");
-  const overlay = objs.slice(start).filter((o) => o.name !== "ai_cue");
-  const apps = filteredApps();
-  const app = apps[model.qs.index];
-  setText(overlay, "switch_filter", (P.filter_labels[model.filter] || "").toUpperCase());
-  setText(overlay, "switch_position", `${model.qs.index + 1}/${apps.length}`);
-  setText(overlay, "switch_initial", initial(app.name));
-  setText(overlay, "switch_name", app.name);
-  setText(overlay, "switch_detail", model.current === app.id ? "● Current app" : rowDetail(app));
-  const hold = named(overlay, "switch_hold"); if (hold) hold.value = 0;
-  return overlay;
-}
-
-function categoriesView() {
-  const objs = tpl("categories");
-  const counts = { all: model.apps.length, favorites: filteredApps("favorites").length };
-  for (const c of P.categories) counts[c.id] = filteredApps(c.id).length;
-  for (const [key, n] of Object.entries(counts)) setText(objs, `category_${key}_count`, String(n).padStart(2, "0"));
-  const ring = named(objs, "category_selected"), tile = named(objs, `category_${model.filter}`);
-  if (ring && tile) { ring.x = tile.x; ring.y = tile.y; }
-  return { objs };
+  const objs = overlayOf("quick-switch");
+  const apps = filteredApps(), app = apps[model.qs.index];
+  setText(objs, "switch_filter", (P.filter_labels[model.filter] || catLabel(model.filter)).toUpperCase());
+  setText(objs, "switch_position", `${String(model.qs.index + 1).padStart(2, "0")}/${String(apps.length).padStart(2, "0")}`);
+  setImage(objs, "switch_tile", tilePath(app, 120));
+  setText(objs, "switch_name", app.name);
+  setText(objs, "switch_detail", app.id === model.current ? "Current app" : rowDetail(app));
+  return objs;
 }
 
 function downloadView() {
-  const objs = tpl("download");
-  const d = model.dl.digits, looking = model.dl.looking;
-  setText(objs, "id_digits", !looking && d && d.length <= 8 ? d : " ");
-  setText(objs, "id_digits_compact", !looking && d.length > 8 ? d : " ");
-  setText(objs, "id_status", looking ? "Looking up…" : d ? " " : "Type the app ID");
+  const { digits, looking, error } = model.dl;
+  const objs = tpl(error ? "download-error" : looking ? "download-lookup" : digits ? "download-typing" : "download");
+  setText(objs, "id_digits", digits);
+  setText(objs, "id_digits_small", digits || " ");
+  setText(objs, "id_status_small", error || "Looking up…");
   return { objs };
 }
 
 function developView() {
-  const objs = tpl("develop");
-  const st = objs.find((o) => o.name && o.name.startsWith("develop_status"));
-  const on = model.usb && model.agent;
-  if (st) {
-    st.text = `● ${model.usb ? (model.agent ? "USB connected · AI agent ready" : "USB connected · waiting for agent") : "Plug in a USB data cable"}`;
-    st.color = on ? C.accent : C.text_secondary; st.name = on ? "develop_status_on" : "develop_status_off";
-  }
-  return { objs };
+  return { objs: tpl(!model.usb ? "develop-unplugged" : model.agent ? "develop" : "develop-waiting") };
 }
 
-function wifiLinkView() {
-  const objs = tpl("wifi-link");
-  setText(objs, "wifilink_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
-  return { objs };
+/* Detail: page 1 actions, page 2 About. The store copy is used for apps that
+   are not on the device or have a newer version. */
+function detailApp() {
+  const d = model.detail;
+  return d.mode === "remote_new" || d.mode === "nospace" || d.mode === "remote_update" ? STORE[d.id] : appById(d.id);
 }
-
+function openDetail(id, { fromStore = false, page = 1 } = {}) {
+  const local = appById(id);
+  let mode;
+  if (local && fromStore && updateIds().includes(id)) mode = "remote_update";
+  else if (local) mode = id === model.current ? "current" : "local";
+  else mode = sizeMB(STORE[id]) > freeMB() ? "nospace" : "remote_new";
+  model.detail = { id, mode, page };
+  go("detail");
+}
 function detailView() {
-  const { mode, app } = model.detail;
-  const template = mode === "local" && model.deleteArmed ? "detail-delete" :
-    { current: "detail-current", local: "detail-local", remote_new: "detail-remote", remote_update: "detail-update" }[mode];
-  const objs = tpl(template);
-  setText(objs, "detail_initial", initial(app.name));
-  setText(objs, "detail_name", app.name);
-  setText(objs, "detail_id", app.id);
-  setText(objs, "detail_facts", facts(app));
-  const local = appById(app.id);
-  const status = mode === "current" ? "● Current app" : mode === "local" ? "Saved · not running" :
-    mode === "remote_update" ? `Update v${local.version} → v${app.version}` : "Not on this device";
-  setText(objs, "detail_status", status);
-  setText(objs, "detail_status_accent", status);
-  const fav = objs.find((o) => o.name && o.name.startsWith("button_favorite"));
-  if (fav) {
-    const on = model.favorites.has(app.id);
-    fav.icon.image = on ? iconPath("star_fill", 32, "orange") : iconPath("star", 32, "white");
-    fav.name = on ? "button_favorite_on" : "button_favorite_off";
+  const d = model.detail, app = detailApp(), local = appById(d.id);
+  const page1 = { current: "detail-current", local: "detail-local", remote_new: "detail-remote",
+                  remote_update: "detail-update", nospace: "detail-nospace" }[d.mode];
+  const objs = tpl(d.page === 2 ? (local ? "detail-about" : "detail-about-remote") : page1);
+  setText(objs, "detail_title", app.name);
+  const fav = model.favorites.has(d.id);
+  setImage(objs, "button_favorite_icon", fav ? iconPath("star_fill", 32, "orange") : iconPath("star", 32, "white"));
+  if (d.page === 2) {
+    setText(objs, "detail_summary", app.summary || "");
+    setText(objs, "detail_version", `v${app.version}`);
+    setText(objs, "detail_size", app.size);
+    setText(objs, "detail_source", app.official ? "Official" : "Community");
+    return { objs };
   }
-  return { objs };
-}
-
-function aboutView() {
-  const app = model.detail.app;
-  const objs = tpl("about");
-  setText(objs, "about_name", app.name);
-  setImage(objs, "button_qr_app_code", `assets/qr/app-${app.id}.png`);
-  setText(objs, "about_summary", app.summary || "");
-  setText(objs, "about_facts", facts(app));
+  setImage(objs, "detail_tile", tilePath(app, 96));
+  if (d.mode === "remote_update") {
+    setText(objs, "detail_meta", `${rowDetail(app)} · v${local.version}`);
+    setText(objs, "detail_meta2", `New v${app.version} · ${app.size}`);
+  } else if (d.mode === "nospace") {
+    setText(objs, "detail_meta", `${rowDetail(app)} · v${app.version}`);
+    setText(objs, "detail_meta2", `Needs ${app.size} · ${freeMB().toFixed(1)} MB free`);
+  } else {
+    setText(objs, "detail_meta", `${rowDetail(app)} · v${app.version}`);
+    setText(objs, "detail_meta2", `${app.size} · ID ${app.id}`);
+  }
   return { objs };
 }
 
@@ -545,434 +654,754 @@ function qrView(p) {
   return { objs };
 }
 
+function progressTexts(p) {
+  const done = p.total * p.pct / 100;
+  return { progress_percent: `${Math.floor(p.pct)}%`, progress_step: p.step,
+           progress_bytes: `${done.toFixed(2)} of ${p.total.toFixed(2)} MB · ${p.pct >= 100 ? "done" : p.rate}` };
+}
 function progressView() {
   const p = model.progress;
-  const objs = tpl({ agent: "progress-agent", download: "progress-download", install: "progress-install" }[p.kind]);
+  const objs = tpl(`progress-${p.kind}`);
   setText(objs, "progress_caption", p.caption);
   setText(objs, "progress_title", p.title);
   setText(objs, "progress_detail", p.detail);
-  setText(objs, "progress_percent", `${Math.floor(p.pct)}%`);
+  for (const [name, text] of Object.entries(progressTexts(p))) setText(objs, name, text);
   const bar = named(objs, "progress"); if (bar) bar.value = p.pct;
-  setText(objs, "progress_bytes", `${(p.total * p.pct / 100).toFixed(2)} of ${p.total.toFixed(2)} MB · ${p.pct >= 100 ? "--" : p.rate}`);
-  setText(objs, "progress_step", p.step);
   return { objs };
 }
+// Ticks update the bound values in place, as the firmware's setters do.
+let spinFrame = 0;
+function tickProgress() {
+  if (!pageLayer || cur().view !== "progress") return;
+  for (const [name, text] of Object.entries(progressTexts(model.progress))) {
+    const span = pageLayer.querySelector(`[data-name="${name}"] span`);
+    if (span) span.textContent = text;
+  }
+  const fill = pageLayer.querySelector('[data-name="progress"] [data-fill]');
+  if (fill) fill.style.width = `${model.progress.pct}%`;
+}
+setInterval(() => {
+  spinFrame = (spinFrame + 1) % 8;
+  for (const img of screen.querySelectorAll('img[data-name$="_spinner"]')) img.src = asset(`assets/anim/spin32-${String(spinFrame).padStart(2, "0")}.png`);
+}, 110);
 
 function resultView() {
   const r = model.result;
-  const objs = tpl({ installed: "result-installed", saved: "result-saved", failed: "result-failed" }[r.kind]);
-  setText(objs, "result_title", r.title);
+  const objs = tpl(`result-${r.kind}`);
+  setText(objs, "result_title", r.title || named(objs, "result_title").text);
   setText(objs, "result_caption", r.caption);
-  setText(objs, "result_detail", r.detail);
-  if (r.second) setText(objs, "button_result_second", r.second);
+  if (r.detail) setText(objs, "result_detail", r.detail);
+  if (r.kind === "installed") {
+    setText(objs, "result_detail", `Opening in ${Math.max(1, 3 - r.elapsed)} s`);
+    for (let i = 1; i <= 3; i++) { const dot = named(objs, `result_dot_${i}`); if (dot) dot.bg = i <= r.elapsed ? C.accent : C.tile; }
+  }
   return { objs };
 }
 
+const NETS = P.networks;
+const visibleNetworks = () => model.wifi.connected ? NETS.filter((n) => n.ssid !== model.wifi.ssid) : NETS;
+function pendingText() {
+  const p = model.pending;
+  if (!p) return "";
+  if (p.kind === "lookup") return `Connect to look up ${p.digits}`;
+  if (p.kind === "update") return `Connect to update ${STORE[p.id].name}`;
+  if (p.kind === "claim") return "Connect to turn on Mosaico AI";
+  if (p.kind === "updates") return "Connect to get updates";
+  return "";
+}
 function wifiView() {
-  let objs = tpl(model.pendingLookup ? "wifi-pending" : "wifi");
   const w = model.wifi;
-  setText(objs, "wifi_connection", w.connected ? w.ssid : w.connecting ? w.connecting : "Not connected");
-  setText(objs, "wifi_detail", w.connected ? "Connected" : w.connecting ? "Connecting…" : "Choose a network");
-  if (!w.connected) objs = without(objs, ["button_forget"]);
-  setText(objs, "wifi_scan", model.scanning ? "SCANNING…" : `NETWORKS · ${NETWORKS.length}`);
-  const rows = model.scanning ? [] : NETWORKS.map((n) => ({
-    networks_title: n.ssid, networks_detail: `${n.secured ? "Secured" : "Open"} · ${n.signal} signal` }));
+  const id = w.connected ? "wifi" : w.connecting ? "wifi-connecting" : model.pending ? "wifi-pending" : "wifi-off";
+  const objs = tpl(id);
+  if (w.connected) {
+    setText(objs, "wifi_connection", w.ssid);
+    setText(objs, "wifi_detail", `Connected · ${w.ip}`);
+  } else if (w.connecting) {
+    setText(objs, "wifi_connection", w.connecting);
+  } else if (model.pending) {
+    setText(objs, "wifi_detail", pendingText());
+  }
+  const nets = model.scanning ? [] : visibleNetworks();
+  setText(objs, "wifi_section", model.scanning ? "SEARCHING…" : `${w.connected ? "OTHER NETWORKS" : "NETWORKS"} · ${nets.length}`);
+  const rows = nets.map((n) => ({ networks_icon: iconPath(n.secured ? "lock" : "wifi", 20, "grey"), networks_title: n.ssid,
+    networks_detail: `${n.secured ? "Secured" : "Open"} · ${n.signal} signal` }));
   return { objs, lists: { networks: rows } };
 }
-
-function entryView(page) {
-  const objs = tpl(page.replace("_", "-"));
-  const e = model.entry, spec = ENTRY[page];
-  let shown = e.text;
-  if (e.text && page !== "city_input" && !e.visible) {
-    shown = page === "token_input" && e.text.length > 8 ? "•".repeat(8) + e.text.slice(-4) : "•".repeat(e.text.length);
-  }
-  const disp = setText(objs, `${page}_display`, e.text ? (shown.length > 18 ? "…" + shown.slice(-17) : shown) : spec.placeholder);
-  if (disp) disp.color = e.text ? C.text : C.text_tertiary;
-  setImage(objs, `button_toggle_${page}`, iconPath(e.visible ? "eye_off" : "eye", 32, "white"));
-  const note = setText(objs, `${page}_note`, e.error || spec.note);
-  if (note) note.color = e.error || page === "token_input" ? C.accent : C.text_secondary;
+function wifiNetworkView() {
+  const objs = tpl("wifi-network");
+  const net = NETS.find((n) => n.ssid === model.wifi.ssid) || NETS[0];
+  setText(objs, "wifi_network_title", model.wifi.ssid);
+  setText(objs, "network_signal", net.signal);
+  setText(objs, "network_security", net.secured ? "WPA2" : "Open");
+  setText(objs, "network_ip", model.wifi.ip);
   return { objs };
 }
 
-const tokenText = () => model.token ? `Set · ends in ${model.token.slice(-4)}` : "Not set";
+function masked(page) {
+  const e = model.entry;
+  if (!e.text) return "";
+  if (!ENTRY[page].secret || e.visible) return e.text;
+  if (page === "own_key") return e.text.length > 4 ? "•".repeat(8) + e.text.slice(-4) : "•".repeat(e.text.length);
+  return "•".repeat(Math.min(e.text.length, 24));
+}
+function entryView(page, stateId, note, noteColor) {
+  const objs = tpl(stateId);
+  const shown = masked(page);
+  setText(objs, `${page}_display`, shown ? (shown.length > 22 ? "…" + shown.slice(-21) : shown) : ENTRY[page].placeholder,
+          shown ? C.text : C.text_tertiary);
+  setImage(objs, `${page}_eye`, iconPath(model.entry.visible ? "eye_off" : "eye", 32, "white"));
+  if (note) setText(objs, `${page}_note`, note, noteColor);
+  if (model.entry.error) setText(objs, `${page}_note`, model.entry.error, C.accent);
+  return { objs, kbDim: page === "password" && model.passwordState === "connecting" };
+}
+function passwordView() {
+  const st = model.passwordState;
+  if (st === "connecting") return entryView("password", "password-connecting", `Connecting to ${model.passwordFor}…`, C.accent);
+  return entryView("password", "password", `For ${model.passwordFor} · 8 or more characters`, C.text_secondary);
+}
+
+function linkText(objs, name, idle) {
+  const ready = model.usb && model.agent;
+  setText(objs, name, ready ? "USB connected · Agent ready" : model.usb ? "USB connected · Waiting for agent" : idle,
+          ready ? C.accent : C.text_secondary);
+  const iconObj = objs[objs.findIndex((o) => o.name === name) - 1];
+  if (iconObj && iconObj.type === "image") iconObj.image = iconPath("usb", 20, ready ? "orange" : "grey");
+}
+function cityView() {
+  const objs = tpl("city");
+  setText(objs, "city_value", model.city || "Not set", model.city ? C.text : C.text_tertiary);
+  linkText(objs, "city_link", "Plug in USB to set it from your computer");
+  return { objs };
+}
+function tokenView() {
+  const objs = tpl(`token-${model.tokenKind}`);
+  if (model.tokenKind === "own") setText(objs, "token_sub", `Key ends in ${model.token.slice(-4)}`);
+  linkText(objs, "token_link", "Or plug in USB to set a key from your computer");
+  return { objs };
+}
 
 function deviceView() {
   const objs = tpl("device");
+  const n = updateIds().length;
   setText(objs, "device_wifi", model.wifi.connected ? model.wifi.ssid : "Not connected");
   setText(objs, "device_city", model.city || "Not set");
-  setText(objs, "device_token", tokenText());
-  setText(objs, "device_summary", `Vibe Mode 0.3.0 · ${model.apps.length} apps`);
+  setText(objs, "device_ai", model.tokenKind === "mosaico" ? "On · included" : model.tokenKind === "own" ?
+    `Own key · ends in ${model.token.slice(-4)}` : "Off · tap to turn on");
+  setText(objs, "device_updates", model.bg ? `Updating ${model.bg.i + 1} of ${model.bg.ids.length}` : n ? `${n} available` : "Up to date",
+          n || model.bg ? C.accent : C.text_secondary);
+  setText(objs, "device_storage", `${usedMB().toFixed(1)} of ${P.nand_capacity_mb} MB used`, model.storageFull ? C.accent : C.text_secondary);
+  setText(objs, "device_link", model.wifi.connected ? `Ready · ${model.wifi.ip}` : "Off · connect Wi-Fi first");
+  return { objs };
+}
+function wifiLinkView() {
+  const objs = tpl("wifi-link");
+  setText(objs, "wifilink_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
+  const t = P.wifi_link_token;
+  setText(objs, "wifilink_token", model.pairingVisible ? `${t.slice(0, 12)}…${t.slice(-4)}` : `•••• •••• •••• ${t.slice(-4)}`);
+  setImage(objs, "wifilink_eye", iconPath(model.pairingVisible ? "eye_off" : "eye", 32, "white"));
   return { objs };
 }
 
-function deviceInfoView() {
-  const objs = tpl("device-info");
-  const used = model.apps.reduce((sum, a) => sum + sizeMB(a), 0);
-  setText(objs, "device_storage", `${model.apps.length} apps · ${used.toFixed(1)} MB used`);
-  setText(objs, "device_endpoint", model.wifi.connected ? `${model.wifi.ip}:7777` : "Connect Wi-Fi first");
-  return { objs };
+function updatesView() {
+  const ids = model.bg ? model.bg.ids : updateIds();
+  if (!model.bg && !ids.length) return { objs: tpl("updates-done") };
+  if (!model.bg && !model.wifi.connected) return { objs: tpl("updates-offline") };
+  const objs = tpl(model.bg ? "updates-running" : "updates");
+  if (model.bg) {
+    setText(objs, "updates_summary", model.bg.paused ? "Paused · waiting for Wi-Fi" :
+      `Updating ${model.bg.i + 1} of ${model.bg.ids.length} in the background`);
+  } else {
+    setText(objs, "updates_summary", `${ids.length} app${ids.length > 1 ? "s" : ""} can be updated`);
+  }
+  const rows = ids.map((id, k) => {
+    const local = appById(id), store = STORE[id];
+    let sub = `v${local.version} to v${store.version} · ${store.size}`, hi = " ";
+    if (model.bg) {
+      if (k < model.bg.i) { sub = " "; hi = `Updated to v${store.version}`; }
+      else if (k === model.bg.i) { sub = " "; hi = model.bg.paused ? "Paused" : `Downloading · ${Math.floor(model.bg.pct)}%`; }
+      else sub = `Waiting · v${store.version}`;
+    }
+    return { updates_tile: tilePath(store, 56), updates_name: store.name, updates_sub: sub, updates_sub_hi: hi };
+  });
+  return { objs, lists: { updates: rows } };
 }
 
-function simpleView(id, edit) { const objs = tpl(id); if (edit) edit(objs); return { objs }; }
+function storageView() {
+  const objs = tpl(model.storageFull ? "storage-full" : "storage");
+  const used = usedMB(), cap = P.nand_capacity_mb;
+  setText(objs, "storage_summary", `${used.toFixed(1)} MB of ${cap} MB used`);
+  const bar = named(objs, "storage_bar"); if (bar) bar.value = Math.round(used / cap * 100);
+  if (!model.storageFull) setText(objs, "storage_legend", `${(cap - used).toFixed(1)} MB free · ${model.apps.length} apps`);
+  const rows = storageApps().map((a) => ({ storage_tile: tilePath(a, 56), storage_name: a.name, storage_sub: rowDetail(a), storage_size: a.size }));
+  return { objs, lists: { storage: rows } };
+}
+const storageApps = () => [...model.apps].sort((a, b) => sizeMB(b) - sizeMB(a));
 
+const simple = (id, edit) => () => { const objs = tpl(id); if (edit) edit(objs); return { objs }; };
 const VIEWS = {
-  home: homeView, categories: categoriesView, download: downloadView, develop: developView, wifi_link: wifiLinkView,
-  detail: detailView, about: aboutView, qr: qrView, progress: progressView, result: resultView, wifi: wifiView,
-  password: () => entryView("password"), city_input: () => entryView("city_input"), token_input: () => entryView("token_input"),
-  city: () => simpleView("city", (o) => setText(o, "city_value", model.city || "Not set")),
-  token: () => simpleView("token", (o) => setText(o, "token_value", tokenText())),
-  device: deviceView, device_info: deviceInfoView,
-  help: () => simpleView("help"),
-  topic: (p) => simpleView(`help-topic-${p.key}`),
-  guide: (p) => simpleView(`guide-${p.step}`),
-  launching: (p) => simpleView("launching", (o) => { setText(o, "launch_initial", initial(p.name)); setText(o, "launch_title", `Opening ${p.name}`); }),
-  running: (p) => simpleView("app-running", (o) => { setText(o, "running_initial", initial(p.name)); setText(o, "running_title", p.name); }),
-  boot: () => ({ objs: [], boot: true }),
+  home: homeView, download: downloadView, develop: developView, detail: detailView, qr: qrView,
+  progress: progressView, result: resultView, wifi: wifiView, wifi_network: wifiNetworkView,
+  password: passwordView,
+  city_input: () => entryView("city_input", "city-input", "Saved for every app", C.text_secondary),
+  own_key: () => entryView("own_key", "own-key", "Starts with sk- · every app can read it", C.text_secondary),
+  city: cityView, token: tokenView, device: deviceView, wifi_link: wifiLinkView,
+  updates: updatesView, storage: storageView, help: simple("help"),
+  guide: (p) => simple(`guide-${p.step}`)(),
+  launching: (p) => simple("launching", (o) => { setImage(o, "launch_tile", tilePath(p.app, 120)); setText(o, "launch_title", `Opening ${p.app.name}`); })(),
+  running: (p) => simple("app-running", (o) => { setImage(o, "running_tile", tilePath(p.app, 120)); setText(o, "running_title", p.app.name); })(),
+  boot: simple("boot"),
 };
 
-/* ---------------- Navigation ---------------- */
+/* ---------------- Navigation and motion ---------------- */
 let stack = [{ view: "home", params: {} }];
-let toastTimer = null, toastText = "";
+let pageLayer = null;
+let skipSlide = false;          // the page already left by an edge swipe
 const cur = () => stack[stack.length - 1];
 
-function render(dir = 0) {
+function move(el, from, to, axis = "X", ms = SLIDE_MS) {
+  if (reducedMotion()) return;
+  el.style.transition = "none";
+  el.style.transform = `translate${axis}(${from}px)`;
+  void el.offsetWidth;
+  el.style.transition = `transform ${ms}ms ${EASE}`;
+  el.style.transform = `translate${axis}(${to}px)`;
+}
+function saveScroll(layer) {
+  if (!layer || !layer._entry || !layer.isConnected) return;
+  const lists = layer.querySelectorAll(".list");
+  layer._entry.scroll = Object.fromEntries([...lists].map((l) => [l.dataset.list, l.scrollTop]));
+}
+function restoreScroll(layer) {
+  const saved = layer._entry && layer._entry.scroll;
+  for (const l of layer.querySelectorAll(".list")) {
+    if (saved && saved[l.dataset.list] != null) l.scrollTop = saved[l.dataset.list];
+    updateFade(l);
+  }
+}
+function updateFade(list) {
+  const fade = list.parentNode && list.parentNode.querySelector(`[data-name="${list.dataset.list}_fade"]`);
+  if (fade) fade.style.visibility = list.scrollTop + list.clientHeight >= list.scrollHeight - 4 ? "hidden" : "visible";
+}
+
+/* render(dir, axis): dir 1 = forward (new page enters from the right or from
+   below), -1 = back, 0 = in place. */
+function render(dir = 0, axis = "X", opts = {}) {
   if (staticMode) return;
-  const { view, params } = cur();
-  const built = VIEWS[view](params || {});
-  const layer = built.boot ? bootLayer() : buildLayer(built.objs, built.lists, onAction);
-  if (model.qs && view !== "running") {
-    // Touch: tapping the card opens the selected app, tapping outside closes.
-    const overlay = buildLayer(quickSwitchObjs(), null, null);
-    const card = STATES["quick-switch"].objects.find((o) => o.name === "switch_card");
-    overlay.addEventListener("click", (e) => {
-      const r = screen.getBoundingClientRect(), k = r.width / 480;
-      const x = (e.clientX - r.left) / k, y = (e.clientY - r.top) / k;
-      const inside = x >= card.x && x < card.x + card.w && y >= card.y && y < card.y + card.h;
-      if (inside) { const app = filteredApps()[model.qs.index]; model.qs = null; runApp(app); }
-      else { model.qs = null; render(0); }
-    });
-    layer.appendChild(overlay);
+  const entry = cur();
+  saveScroll(pageLayer);
+  if (entry.resetScroll) { entry.scroll = null; entry.resetScroll = false; }
+  if (skipSlide) { opts.instant = true; skipSlide = false; }
+  const built = VIEWS[entry.view](entry.params || {});
+  const layer = buildLayer(built.objs, built.lists, onAction);
+  layer.classList.add("page");
+  if (built.kbDim) layer.querySelector(".o-keyboard")?.classList.add("kb-dim");
+  layer._entry = entry;
+  let sheet = null;
+  if (built.overlay) {
+    const scrimIdx = 0;
+    const scrim = buildLayer(built.overlay.slice(scrimIdx, model.drawer ? 2 : 1), null, onAction);
+    sheet = buildLayer(built.overlay.slice(model.drawer ? 2 : 1), null, onAction);
+    sheet.dataset.overlay = model.drawer ? "sheet" : "switch";
+    layer.append(scrim, sheet);
+    if (!model.drawer) {
+      // Quick switch: tapping outside the card closes it.
+      scrim.addEventListener("click", () => closeQuick());
+      scrim.style.pointerEvents = "auto";
+    }
   }
-  // Decorative full-screen layers must not swallow taps meant for the page.
-  const passive = (l) => { l.style.pointerEvents = "none"; return l; };
-  if (toastText) {
-    const t = clone(STATES["home-ai-hint"].objects).filter((o) => o.name === "ai_toast" || o.name === "ai_toast_text");
-    setText(t, "ai_toast_text", toastText);
-    layer.appendChild(passive(buildLayer(t, null, null)));
-  }
-  if (view !== "running" && view !== "boot") layer.appendChild(passive(buildLayer([cueObj()], null, null)));
-  screen.replaceChildren(layer);
-  if (dir && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    layer.style.transform = `translateX(${dir * SLIDE}px)`;
-    requestAnimationFrame(() => {
-      layer.style.transition = `transform ${SLIDE_MS}ms cubic-bezier(.215,.61,.355,1)`;
-      layer.style.transform = "translateX(0)";
-    });
-  }
+  const old = pageLayer;
+  for (const n of [...screen.children]) if (n !== old && !n.classList.contains("toast-layer")) n.remove();
+  pageLayer = layer;
+  screen.insertBefore(layer, screen.querySelector(".toast-layer"));
+  if (dir && old && !reducedMotion() && !opts.instant) {
+    old.style.pointerEvents = "none";
+    move(old, 0, -dir * SLIDE, axis);
+    move(layer, dir * SLIDE, 0, axis);
+    setTimeout(() => old.remove(), SLIDE_MS + 30);
+  } else if (old) old.remove();
+  restoreScroll(layer);
+  if (sheet && opts.sheetIn) move(sheet, model.drawer ? 380 : 24, 0, "Y", model.drawer ? I.sheet_ms : 200);
+  mountCue();
 }
-function cueObj() {
-  const cue = clone(STATES.home.objects.find((o) => o.name === "ai_cue"));
-  cue.bg = ai.down || model.qs ? C.accent : C.outline;
-  return cue;
-}
-function bootLayer() {
-  const layer = document.createElement("div");
-  layer.className = "layer";
-  const t = { type: "label", x: 0, y: 200, w: 480, h: 64, text: "mosaico", font: "dot", size: 64, color: C.accent, align: "center" };
-  layer.appendChild(renderObj(t, null));
-  return layer;
+function mountCue() {
+  screen.querySelector(".cue-layer")?.remove();
+  if (["running", "boot"].includes(cur().view)) return;
+  const cue = buildLayer([{ type: "container", x: T.screen.ai_key_center_x - 18, y: 3, w: 36, h: 4,
+    bg: ai.down || model.qs ? C.accent : C.outline, radius: 2, name: "ai_cue" }], null, null);
+  cue.classList.add("cue-layer");
+  screen.appendChild(cue);
 }
 function go(view, params = {}) { stack.push({ view, params }); render(1); }
-function replace(view, params = {}) { stack[stack.length - 1] = { view, params }; render(1); }
-function home() { stack = [{ view: "home", params: {} }]; render(-1); }
+function replace(view, params = {}, dir = 1) { stack[stack.length - 1] = { view, params }; render(dir); }
+function home() { stack = [stack[0].view === "home" ? stack[0] : { view: "home", params: {} }]; render(-1); }
+function popTo(views) { while (stack.length > 1 && views.includes(cur().view)) stack.pop(); }
 function back() {
-  if (stack.length > 1) { stack.pop(); model.deleteArmed = false; render(-1); return true; }
+  const view = cur().view;
+  if (["progress", "launching", "running", "boot"].includes(view)) return false;
+  if (model.qs) { closeQuick(); return true; }
+  if (model.drawer) { closeDrawer(); return true; }
+  if (view === "detail" && model.detail.page === 2) { setDetailPage(1); return true; }
+  if (view === "wifi" && model.pending) { model.pending = null; toast("Cancelled"); }
+  if (view === "result") { resultDone(); return true; }
+  if (stack.length > 1) { stack.pop(); render(-1); return true; }
   return false;
 }
-function toast(text) {
-  toastText = text; render(0);
+function setDetailPage(page) {
+  if (!model.detail || model.detail.page === page) return;
+  model.detail.page = page;
+  render(page === 2 ? 1 : -1, "Y");
+}
+function openDrawer() { model.drawer = true; render(0, "X", { sheetIn: true }); }
+function closeDrawer(after) {
+  const sheet = pageLayer && pageLayer.querySelector('[data-overlay="sheet"]');
+  const finish = () => { model.drawer = false; render(0); if (after) after(); };
+  if (!sheet || reducedMotion()) return finish();
+  move(sheet, 0, 380, "Y", 220);
+  setTimeout(finish, 210);
+}
+
+/* Banner from the top edge, without rebuilding the page. Tap it to follow it
+   (when it has an action) or to dismiss it. */
+let toastTimer = 0, toastState = null;
+function toast(text, action) {
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastText = ""; render(0); }, TOAST_MS);
+  toastState = { text, action };
+  toastTimer = setTimeout(hideToast, action ? I.toast_ms * 2 : I.toast_ms);
+  screen.querySelector(".toast-layer")?.remove();
+  if (staticMode) return;
+  const t = tpl("home-hint").filter((o) => o.name === "toast" || o.name === "toast_text");
+  setText(t, "toast_text", text);
+  const layer = buildLayer(t, null, null);
+  layer.classList.add("toast-layer");
+  const box = named(t, "toast");
+  const hit = Object.assign(document.createElement("button"), { type: "button", className: "toast-hit" });
+  Object.assign(hit.style, { left: px(box.x), top: px(box.y), width: px(box.w), height: px(box.h), borderRadius: px(box.radius) });
+  hit.setAttribute("aria-label", text);
+  hit.addEventListener("click", (e) => { e.stopPropagation(); const a = toastState && toastState.action; hideToast(); if (a) onAction(a); });
+  layer.appendChild(hit);
+  screen.appendChild(layer);
+  move(layer, -96, 0, "Y", 200);
+}
+function hideToast() {
+  clearTimeout(toastTimer);
+  toastState = null;
+  const el = screen.querySelector(".toast-layer");
+  if (!el) return;
+  el.style.transition = "transform 160ms cubic-bezier(.55,.055,.675,.19)";
+  el.style.transform = "translateY(-96px)";
+  setTimeout(() => el.remove(), 170);
 }
 function note(text) { document.getElementById("simStatus").textContent = text; }
 
 /* ---------------- Simulated work ---------------- */
-let job = null;
-function cancelJob() { if (job) { clearInterval(job); job = null; } }
+let job = 0;
+function cancelJob() { clearInterval(job); job = 0; }
 function runProgress(p, ms, onDone) {
   cancelJob();
   model.progress = Object.assign({ pct: 0 }, p);
+  if (cur().view === "progress") replace("progress", {}, 0); else go("progress");
   const started = performance.now();
-  if (cur().view === "progress") replace("progress"); else go("progress");
   job = setInterval(() => {
     const k = Math.min(1, (performance.now() - started) / ms);
     model.progress.pct = k * 100;
-    if (p.steps) model.progress.step = k < 0.82 ? p.steps[0] : p.steps[1];
-    if (cur().view === "progress") render(0);
-    if (k >= 1) { cancelJob(); setTimeout(onDone, 350); }
-  }, 100);
+    if (p.steps) model.progress.step = k < 0.75 ? p.steps[0] : p.steps[1];
+    tickProgress();
+    if (k >= 1) { cancelJob(); setTimeout(onDone, 300); }
+  }, 80);
 }
-function showResult(r) { model.result = r; stack = [{ view: "home", params: {} }, { view: "result", params: {} }]; render(1); }
-function launch(app, viaInstall) {
-  stack = [{ view: "launching", params: { name: app.name } }];
+let resultTimer = 0;
+function showResult(r) {
+  clearInterval(resultTimer);
+  model.result = Object.assign({ elapsed: 0 }, r);
+  popTo(["progress", "result"]);
+  stack.push({ view: "result", params: {} });
   render(1);
-  setTimeout(() => { model.running = app.name; stack = [{ view: "running", params: { name: app.name } }]; render(1); }, viaInstall ? 900 : 1300);
+  if (r.kind === "installed") {
+    model.result.elapsed = 1; render(0);
+    resultTimer = setInterval(() => {
+      if (cur().view !== "result") return clearInterval(resultTimer);
+      model.result.elapsed++;
+      if (model.result.elapsed > 3) { clearInterval(resultTimer); return launch(r.app, true); }
+      render(0);
+    }, 1000);
+  }
+}
+function resultDone() {
+  clearInterval(resultTimer);
+  stack.pop();
+  popTo(["detail", "download", "progress"]);
+  render(-1);
+}
+function launch(app, viaInstall) {
+  clearInterval(resultTimer);
+  model.qs = null; model.drawer = false;
+  stack = [{ view: "launching", params: { app } }];
+  render(1);
+  setTimeout(() => { stack = [{ view: "running", params: { app } }]; render(1); }, viaInstall ? 900 : 1300);
+}
+function blockLowBattery() {
+  if (!model.lowBattery) return false;
+  showResult({ kind: "battery" });
+  return true;
 }
 function install(app, from) {
+  if (blockLowBattery()) return;
   const total = sizeMB(app) || 1.5;
   runProgress({ kind: "install", caption: from === "store" ? "FROM MOSAICO IDEAS" : "FROM YOUR LIBRARY",
     title: "Switching apps", detail: `${app.name} · v${app.version}`, total, rate: "1.6 MB/s",
-    step: "Step 1 of 2 · Checking", steps: ["Step 1 of 2 · Writing", "Step 2 of 2 · Verifying"] }, 3200, () => {
+    step: "Step 1 of 2 · Writing", steps: ["Step 1 of 2 · Writing", "Step 2 of 2 · Checking"] }, 2600, () => {
+    const prev = model.current;
     model.current = app.id;
-    showResult({ kind: "installed", title: "App installed", caption: `${app.name} · v${app.version}`, detail: "Restarting into your app…" });
-    setTimeout(() => { if (cur().view === "result") launch(app, true); }, 1500);
+    model.recent = [prev, ...model.recent].filter((r, i, all) => r && r !== app.id && all.indexOf(r) === i).slice(0, 12);
+    showResult({ kind: "installed", caption: `${app.name} · v${app.version}`, app });
   });
 }
 function runApp(app) {
-  if (model.current === app.id) launch(app, false);
-  else install(app, "library");
+  if (app.id === model.current) return launch(app, false);
+  if (blockLowBattery()) return;
+  install(app, "library");
 }
-function download(app, thenRun) {
-  const total = sizeMB(app) || 1;
-  runProgress({ kind: "download", caption: "FROM MOSAICO IDEAS", title: "Downloading", detail: `${app.name} · v${app.version}`,
-    total, rate: "512 KB/s", step: "File 1 of 3", steps: ["File 2 of 3", "File 3 of 3 · Checking"] }, 3800, () => {
+function download(app, thenRun, kind = "download") {
+  if (sizeMB(app) > freeMB()) return showResult({ kind: "nospace", caption: `${app.name} needs ${app.size}`, app });
+  if (!model.wifi.connected) { model.pending = { kind: "update", id: app.id, thenRun }; return go("wifi"); }
+  if (model.failNext) {
+    model.failNext = false; syncSim();
+    return showResult({ kind: "failed", caption: `${app.name} · v${app.version}`, app, thenRun });
+  }
+  const update = !!appById(app.id);
+  runProgress({ kind: update ? "update" : "download", caption: "FROM MOSAICO IDEAS", title: update ? "Updating" : "Downloading",
+    detail: `${app.name} · v${app.version}`, total: sizeMB(app), rate: "512 KB/s",
+    step: "File 1 of 3", steps: ["File 2 of 3", "File 3 of 3 · Checking"] }, 3200, () => {
     const existing = appById(app.id);
     if (existing) Object.assign(existing, clone(app)); else model.apps.push(clone(app));
-    if (thenRun) install(app, "store");
-    else showResult({ kind: "saved", title: "Saved to My Apps", caption: `${app.name} · v${app.version}`,
-                      detail: "Open it any time\nfrom the list.", second: "Open now", app });
+    if (thenRun) return runApp(appById(app.id));
+    showResult({ kind: update ? "updated" : "saved", caption: `${app.name} · v${app.version}`, app: appById(app.id) });
   });
 }
 function lookup() {
   const id = model.dl.digits;
-  if (!id) return toast("Type an app ID first");
-  if (!model.wifi.connected) { model.pendingLookup = true; go("wifi"); return; }
-  model.dl.looking = true; render(0);
+  const fail = (error) => { model.dl.looking = false; model.dl.error = error; render(0); };
+  if (!id) return fail("Type an app ID first");
+  if (!model.wifi.connected) { model.pending = { kind: "lookup", digits: id }; return go("wifi"); }
+  model.dl.looking = true; model.dl.error = ""; render(0);
   setTimeout(() => {
-    if (cur().view !== "download") return;
+    if (cur().view !== "download" || !model.dl.looking) return;
     model.dl.looking = false;
-    if (id === "500500") return toast("Store is busy. Try later.");
-    if (id === "666666") return toast("Not for this device");
-    const found = STORE[id];
-    if (!found) return toast("No app with this ID");
-    const app = clone(found);
-    const local = appById(id);
-    if (local && local.version === app.version) {
-      model.detail = { mode: model.current === id ? "current" : "local", app: local };
-    } else {
-      model.detail = { mode: local ? "remote_update" : "remote_new", app };
-    }
+    if (id === "500500") return fail("Store is busy. Try later.");
+    if (id === "666666") return fail("Not for this device");
+    if (!STORE[id]) return fail("No app with this ID");
     model.dl.digits = "";
-    go("detail");
+    render(0);
+    openDetail(id, { fromStore: true });
   }, 900);
 }
 function connect(ssid) {
   model.wifi = { connected: false, connecting: ssid, ssid: "", ip: "" };
-  stack = stack.filter((s) => s.view !== "password");
-  render(-1);
+  render(0);
   setTimeout(() => {
-    model.wifi = { connected: true, ssid, ip: "192.168.1.20" };
+    model.wifi = { connected: true, ssid, ip: "192.168.1.20", connecting: "" };
+    model.passwordState = "typing";
     syncSim();
-    if (model.pendingLookup) {
-      model.pendingLookup = false;
-      stack = stack.filter((s) => s.view !== "wifi");
-      render(-1);
-      lookup();
-    } else render(0);
-  }, 1200);
+    let claimed = false;
+    if (model.tokenKind === "none" && !model.aiOptOut) { model.tokenKind = "mosaico"; claimed = true; }
+    if (model.bg && model.bg.paused) model.bg.paused = false;
+    const p = model.pending;
+    model.pending = null;
+    popTo(["wifi", "password", "wifi_network"]);
+    if (cur().view === "guide") { stack = [{ view: "home", params: {} }]; }
+    if (p && p.kind === "lookup") { model.dl = { digits: p.digits, looking: false, error: "" }; render(-1); return lookup(); }
+    if (p && p.kind === "update") { render(-1); return download(STORE[p.id], p.thenRun); }
+    if (p && p.kind === "claim") { model.tokenKind = "mosaico"; model.aiOptOut = false; render(-1); return toast("Mosaico AI is on"); }
+    if (p && p.kind === "updates") { render(-1); return startUpdates(); }
+    if (stack[stack.length - 1].view !== "wifi") stack.push({ view: "wifi", params: {} });
+    render(-1);
+    toast(claimed ? "Mosaico AI is on" : `Connected to ${ssid}`);
+  }, 1400);
 }
+
+/* Background updates: one app at a time; Home shows "↓ k/n" in the strip. */
+let bgTimer = 0;
+function startUpdates() {
+  const ids = updateIds();
+  if (!ids.length) return toast("Up to date");
+  if (!model.wifi.connected) { model.pending = { kind: "updates" }; return go("wifi"); }
+  model.bg = { ids, i: 0, pct: 0, paused: false };
+  clearInterval(bgTimer);
+  bgTimer = setInterval(() => {
+    const bg = model.bg;
+    if (!bg) return clearInterval(bgTimer);
+    if (!model.wifi.connected) { if (!bg.paused) { bg.paused = true; refreshBg(); toast("Updates will resume on Wi-Fi"); } return; }
+    bg.paused = false;
+    bg.pct += 5;
+    if (bg.pct >= 100) {
+      const id = bg.ids[bg.i];
+      Object.assign(appById(id), { version: STORE[id].version, size: STORE[id].size });
+      bg.i++; bg.pct = 0;
+      if (bg.i >= bg.ids.length) { model.bg = null; clearInterval(bgTimer); refreshBg(true); return toast("Apps updated"); }
+    }
+    refreshBg();
+  }, 150);
+  render(0);
+}
+function refreshBg(full) {
+  const view = cur().view;
+  if (view === "updates" || view === "device" || full) return render(0);
+  const badge = pageLayer && pageLayer.querySelector('[data-name="status_badge"] span');
+  if (badge) badge.textContent = badgeText();
+}
+
 function qrTarget(name) {
   if (name === "app") {
-    const app = model.detail.app;
-    return { name: `app-${app.id}`, title: `${app.name} on Mosaico Ideas`, url: app.url.replace(/^https?:\/\//, "") };
+    const app = detailApp();
+    return { name: `app-${app.id}`, title: app.name, url: app.url.replace(/^https?:\/\//, "") };
   }
-  const titles = { ideas: "Browse apps on Mosaico Ideas", develop: "Vibe-coding guide", "help-start": "Getting started",
+  const titles = { ideas: "Mosaico Ideas", develop: "Vibe-coding guide", "help-start": "Getting started",
                    "help-ids": "App IDs & sharing", "help-fix": "Troubleshooting" };
-  return { name, title: titles[name] || "Scan with your phone camera", url: P.qr_urls[name] || "" };
+  return { name, title: titles[name] || "Scan with your phone", url: P.qr_urls[name] || "" };
 }
+function startEntry(page, text, visible) { model.entry = { text, visible, error: "" }; kbMode = "lower"; go(page); }
 function submitEntry(page) {
-  const e = model.entry;
+  const e = model.entry, value = e.text.trim();
   if (page === "password") {
-    if (e.text.length < 8) { e.error = "Use at least 8 characters"; return render(0); }
-    if (e.text === "wrongpass") { e.error = "Wrong password. Try again."; return render(0); }
-    return connect(model.password.ssid);
+    if (model.passwordState === "connecting") return;
+    if (e.text.length < 8) { e.error = "Use 8 or more characters"; return render(0); }
+    model.passwordState = "connecting"; e.error = ""; render(0);
+    if (e.text === "wrongpass") {
+      return setTimeout(() => { model.passwordState = "typing"; e.error = "Wrong password. Try again."; if (cur().view === "password") render(0); }, 1200);
+    }
+    return connectFromPassword();
   }
-  const value = e.text.trim();
   if (page === "city_input") {
     if (!value) { e.error = "Type a city name first"; return render(0); }
     model.city = value; back(); return toast("City saved");
   }
-  model.token = value; back(); return toast(value ? "AI token saved" : "AI token cleared");
+  if (page === "own_key") {
+    if (!value) { e.error = "Type a key first"; return render(0); }
+    model.token = value; model.tokenKind = "own"; back(); return toast("Key saved");
+  }
+}
+function connectFromPassword() {
+  const ssid = model.passwordFor;
+  setTimeout(() => {
+    if (cur().view !== "password") return;
+    model.wifi = { connected: false, connecting: ssid, ssid: "", ip: "" };
+    connect(ssid);
+  }, 200);
 }
 
 /* ---------------- Actions ---------------- */
-let deleteTimer = null;
 function onAction(action) {
   const [kind, arg, extra] = action.split(":");
   if (kind === "go") {
     if (arg === "home") return home();
-    if (arg === "download") model.dl = { digits: "", looking: false };
-    if (arg === "city_input") { model.entry = { text: model.city || "", visible: true, error: "" }; kbMode = "lower"; }
-    if (arg === "token_input") { model.entry = { text: model.token || "", visible: false, error: "" }; kbMode = "lower"; }
+    if (arg === "download") model.dl = { digits: "", looking: false, error: "" };
+    if (arg === "city_input") return startEntry("city_input", model.city || "", true);
+    if (arg === "own_key") return startEntry("own_key", model.tokenKind === "own" ? model.token : "", false);
+    if (arg === "storage" && cur().view === "result") { stack.pop(); popTo(["detail"]); }
     return go(arg);
   }
   if (action === "back") return back();
+  if (kind === "drawer") return arg === "open" ? openDrawer() : closeDrawer();
   if (kind === "filter") {
-    model.filter = arg;
-    if (cur().view === "categories") { stack.pop(); return render(-1); }
-    return render(0);
+    return closeDrawer(() => {
+      if (model.filter === arg) return;
+      model.filter = arg;
+      cur().resetScroll = true;
+      render(0);
+    });
   }
+  if (kind === "qs" && arg === "open") return openQuickPick();
   if (kind === "qr") return go("qr", qrTarget(arg));
-  if (kind === "help") {
-    if (arg !== "topics") return go("topic", { key: arg });
-    const prev = stack[stack.length - 2];
-    return prev && prev.view === "help" ? back() : go("help");
-  }
+  if (kind === "help") return go("qr", qrTarget(arg === "develop" ? "develop" : `help-${arg}`));
   if (kind === "guide") {
-    if (arg === "done") { model.guideDone = true; return home(); }
-    return replace("guide", { step: Number(arg) });
+    if (arg === "done") { model.guideDone = true; stack = [{ view: "home", params: {} }]; return render(1); }
+    if (arg === "wifi") { model.guideDone = true; stack = [{ view: "home", params: {} }, { view: "wifi", params: {} }]; return render(1); }
+    const step = Number(arg), prev = cur().view === "guide" ? cur().params.step : 0;
+    if (cur().view !== "guide") { stack.push({ view: "guide", params: { step } }); return render(1); }
+    return replace("guide", { step }, step > prev ? 1 : -1);
   }
   if (kind === "key") {
     const d = model.dl;
     if (d.looking) return;
+    if (arg === "go") return lookup();
+    d.error = "";
     if (arg === "del") d.digits = d.digits.slice(0, -1);
-    else if (arg === "go") return lookup();
-    else if (d.digits.length < 16) d.digits += arg;
+    else if (arg === "clear") d.digits = "";
+    else if (d.digits.length < 12) d.digits += arg;
     return render(0);
   }
-  if (kind === "row" && arg === "apps") {
-    const app = filteredApps()[Number(extra)];
-    model.detail = { mode: model.current === app.id ? "current" : "local", app };
-    return go("detail");
+  if (kind === "row") {
+    const i = Number(extra);
+    if (arg === "apps") return openDetail(filteredApps()[i].id);
+    if (arg === "updates") return openDetail((model.bg ? model.bg.ids : updateIds())[i], { fromStore: true });
+    if (arg === "storage") return openDetail(storageApps()[i].id, { page: 2 });
+    if (arg === "networks") {
+      const n = visibleNetworks()[i];
+      if (model.wifi.connecting) return;
+      if (!n.secured) return connect(n.ssid);
+      model.passwordFor = n.ssid; model.passwordState = "typing";
+      return startEntry("password", "", false);
+    }
   }
-  if (kind === "row" && arg === "networks") {
-    const n = NETWORKS[Number(extra)];
-    if (!n.secured) return connect(n.ssid);
-    model.password = { ssid: n.ssid };
-    model.entry = { text: "", visible: false, error: "" };
-    kbMode = "lower";
-    return go("password");
-  }
+  if (kind === "detail") return setDetailPage(Number(arg));
   if (kind === "app") {
-    const app = model.detail.app;
+    const d = model.detail, app = detailApp();
     if (arg === "favorite") {
-      const on = !model.favorites.has(app.id);
-      if (on) model.favorites.add(app.id); else model.favorites.delete(app.id);
+      const on = !model.favorites.has(d.id);
+      if (on) model.favorites.add(d.id); else model.favorites.delete(d.id);
+      render(0);
       return toast(on ? "Added to Favorites" : "Removed from Favorites");
     }
-    if (arg === "run") return runApp(app);
+    if (arg === "run") return runApp(appById(d.id));
     if (arg === "update") {
-      const latest = STORE[app.id];
-      if (!model.wifi.connected) { go("wifi"); return toast("Connect Wi-Fi first"); }
-      if (latest && latest.version !== app.version) {
-        model.detail = { mode: "remote_update", app: clone(latest) };
-        return replace("detail");
-      }
-      return toast(`Up to date: ${app.name}`);
-    }
-    if (arg === "delete_ask") {
-      model.deleteArmed = true; render(0);
-      clearTimeout(deleteTimer);
-      deleteTimer = setTimeout(() => { model.deleteArmed = false; if (cur().view === "detail") render(0); }, 4000);
-      return;
-    }
-    if (arg === "delete") {
-      model.apps = model.apps.filter((a) => a.id !== app.id);
-      model.favorites.delete(app.id);
-      if (model.current === app.id) model.current = null;
-      model.deleteArmed = false;
-      home(); return toast(`Deleted: ${app.name}`);
+      if (!model.wifi.connected) { model.pending = { kind: "update", id: d.id, thenRun: false }; go("wifi"); return toast("Connect Wi-Fi first"); }
+      if (updateIds().includes(d.id)) { model.detail.mode = "remote_update"; return render(0); }
+      return toast("Up to date");
     }
   }
   if (kind === "store") {
-    const app = model.detail.app;
-    if (arg === "run") return download(app, true);
-    if (arg === "keep") return download(app, false);
-    if (arg === "cancel") { cancelJob(); stack = stack.filter((s) => s.view !== "progress"); render(-1); return toast("Download cancelled"); }
+    const app = detailApp();
+    if (arg === "run") return download(STORE[app.id], true);
+    if (arg === "keep") return download(STORE[app.id], false);
+    if (arg === "cancel") { cancelJob(); stack.pop(); render(-1); return toast("Download cancelled"); }
   }
   if (kind === "result") {
-    if (arg === "second" && model.result && model.result.app) return runApp(model.result.app);
+    const r = model.result;
+    if (arg === "done" || arg === "stay") return resultDone();
+    if (arg === "open" && r.app) { clearInterval(resultTimer); return r.kind === "installed" ? launch(r.app, true) : runApp(r.app); }
+    if (arg === "retry" && r.app) { stack.pop(); return download(STORE[r.app.id], r.thenRun); }
   }
-  if (kind === "wifi") {
-    if (arg === "forget") { model.wifi = { connected: false, ssid: "", ip: "" }; syncSim(); return render(0); }
-    if (arg === "scan") { model.scanning = true; render(0); setTimeout(() => { model.scanning = false; if (cur().view === "wifi") render(0); }, 1200); return; }
+  if (kind === "wifi" && arg === "scan") {
+    model.scanning = true; render(0);
+    return setTimeout(() => { model.scanning = false; if (cur().view === "wifi") render(0); }, 1200);
   }
-  if (kind === "token" && arg === "clear") { model.token = ""; render(0); return toast("AI token cleared"); }
+  if (kind === "updates" && arg === "all") return startUpdates();
+  if (kind === "token" && arg === "claim") {
+    if (!model.wifi.connected) { model.pending = { kind: "claim" }; return go("wifi"); }
+    model.tokenKind = "mosaico"; model.aiOptOut = false; render(0); return toast("Mosaico AI is on");
+  }
   if (ENTRY[kind] && arg === "toggle") { model.entry.visible = !model.entry.visible; return render(0); }
+  if (kind === "wifi_link" && arg === "toggle") { model.pairingVisible = !model.pairingVisible; return render(0); }
+  if (kind === "hold") {
+    if (arg === "delete") {
+      const app = appById(model.detail.id);
+      model.apps = model.apps.filter((a) => a.id !== app.id);
+      model.favorites.delete(app.id);
+      model.recent = model.recent.filter((r) => r !== app.id);
+      if (model.current === app.id) model.current = null;
+      stack.pop(); render(-1);
+      return toast(`Deleted ${app.name}`);
+    }
+    if (arg === "forget") {
+      model.wifi = { connected: false, ssid: "", ip: "", connecting: "" }; syncSim();
+      stack.pop(); render(-1); return toast("Wi-Fi forgotten");
+    }
+    if (arg === "turnoff") { model.tokenKind = "none"; model.aiOptOut = true; render(0); return toast("Mosaico AI turned off"); }
+    if (arg === "clear") { model.tokenKind = "none"; model.token = ""; render(0); return toast("Key removed"); }
+  }
   if (kind === "kb") {
     const page = cur().view, e = model.entry;
+    if (page === "password" && model.passwordState === "connecting") return;
     const ch = action.slice(3);
     if (ch === "shift") kbMode = kbMode === "upper" ? "lower" : "upper";
     else if (ch === "sym") kbMode = kbMode === "sym" ? "lower" : "sym";
     else if (ch === "del") e.text = e.text.slice(0, -1);
+    else if (ch === "clear") e.text = "";
     else if (ch === "go") return submitEntry(page);
-    else if (e.text.length < ENTRY[page].limit) { e.text += ch; e.error = ""; if (kbMode === "upper") kbMode = "lower"; }
+    else if (e.text.length < ENTRY[page].limit) { e.text += ch; if (kbMode === "upper") kbMode = "lower"; }
+    if (ch !== "go") e.error = "";
     return render(0);
   }
-  if (kind === "proto" && arg === "return") return enterVibeMode(false);
 }
 
 /* ---------------- AI key ---------------- */
-const ai = { down: false, longFired: false, pending: false, longTimer: 0, singleTimer: 0, bootHold: false, holdRaf: 0, holdStart: 0 };
+const ai = { down: false, longFired: false, lastPress: 0, singleTimer: 0, longTimer: 0, bootHold: false, idleTimer: 0, holdRaf: 0, holdStart: 0 };
 const aiKey = document.getElementById("aiKey");
-function setKeyLight() { aiKey.classList.toggle("on", ai.down); const cue = screen.querySelector('[data-name="ai_cue"]'); if (cue) cue.style.background = ai.down || model.qs ? C.accent : C.outline; }
+function setKeyLight() {
+  aiKey.classList.toggle("on", ai.down);
+  const cue = screen.querySelector('[data-name="ai_cue"]');
+  if (cue) cue.style.background = ai.down || model.qs ? C.accent : C.outline;
+}
+function resetQuickIdle() {
+  clearTimeout(ai.idleTimer);
+  if (model.qs) ai.idleTimer = setTimeout(() => closeQuick(), I.quick_idle_ms);
+}
+function openQuick() {
+  const apps = filteredApps();
+  if (!apps.length) return toast("No apps in this list");
+  model.aiDoubleUsed = true;
+  hideToast();
+  const at = apps.findIndex((a) => a.id === model.current);
+  model.qs = { index: (at + 1) % apps.length };
+  resetQuickIdle();
+  render(0, "X", { sheetIn: true });
+}
+function closeQuick() { clearTimeout(ai.idleTimer); model.qs = null; render(0); }
+function openQuickPick() {
+  const app = filteredApps()[model.qs.index];
+  clearTimeout(ai.idleTimer); model.qs = null;
+  runApp(app);
+}
 function aiDown() {
   if (ai.down) return;
   ai.down = true; ai.longFired = false; setKeyLight();
   if (ai.bootHold || staticMode) return;
-  clearTimeout(ai.longTimer);
-  ai.longTimer = setTimeout(() => { ai.longFired = true; gesture("long"); }, LONG_MS);
-  if (model.qs) startHold();
+  if (model.qs) {
+    resetQuickIdle();
+    ai.longTimer = setTimeout(() => { ai.longFired = true; stopHoldBar(); openQuickPick(); }, I.quick_hold_ms);
+    startHoldBar();
+  }
 }
 function aiUp() {
   if (!ai.down) return;
-  ai.down = false; setKeyLight(); clearTimeout(ai.longTimer); stopHold();
-  if (ai.bootHold) { ai.bootHold = false; note("AI 键已松开，开始识别按键"); return; }
+  ai.down = false; setKeyLight(); clearTimeout(ai.longTimer); stopHoldBar();
+  if (ai.bootHold) { ai.bootHold = false; note("已松开 AI 键，Vibe Mode 开始响应按键。"); return; }
   if (staticMode || ai.longFired) return;
-  if (ai.pending) { clearTimeout(ai.singleTimer); ai.pending = false; gesture("double"); }
-  else { ai.pending = true; ai.singleTimer = setTimeout(() => { ai.pending = false; gesture("single"); }, DOUBLE_MS); }
+  aiPress();
 }
-function startHold() {
+function aiPress() {
+  const view = cur().view, now = performance.now();
+  if (model.qs) {
+    model.qs.index = (model.qs.index + 1) % filteredApps().length;
+    resetQuickIdle();
+    return render(0);
+  }
+  if (view === "progress") return toast(model.progress.kind === "download" ? "Tap Cancel to stop" : "Installing · please wait");
+  if (["launching", "running", "boot"].includes(view)) return;
+  if (view === "guide") {
+    const step = cur().params.step;
+    if (step > 1) replace("guide", { step: step - 1 }, -1);
+    return;
+  }
+  if (view === "home" && !model.drawer) {
+    if (now - ai.lastPress < I.double_press_ms) { clearTimeout(ai.singleTimer); ai.lastPress = 0; return openQuick(); }
+    ai.lastPress = now;
+    ai.singleTimer = setTimeout(() => {
+      if (cur().view !== "home" || model.qs) return;
+      if (!model.aiDoubleUsed && model.aiHints < I.ai_hint_max) { model.aiHints++; toast("Press AI twice to switch apps"); }
+    }, I.double_press_ms);
+    return;
+  }
+  // Every other page: Back right away. A second press within the double-press
+  // window on Home then opens quick switch, so "AI ×2" works from anywhere.
+  ai.lastPress = now;
+  back();
+}
+function startHoldBar() {
   ai.holdStart = performance.now();
   const step = () => {
     const bar = screen.querySelector('[data-name="switch_hold"] [data-fill]');
-    if (bar) bar.style.width = `${Math.min(100, (performance.now() - ai.holdStart) / LONG_MS * 100)}%`;
+    if (bar) bar.style.width = `${Math.min(100, (performance.now() - ai.holdStart) / I.quick_hold_ms * 100)}%`;
     ai.holdRaf = requestAnimationFrame(step);
   };
   ai.holdRaf = requestAnimationFrame(step);
 }
-function stopHold() {
+function stopHoldBar() {
   cancelAnimationFrame(ai.holdRaf);
   const bar = screen.querySelector('[data-name="switch_hold"] [data-fill]');
   if (bar) bar.style.width = "0%";
 }
-function gesture(g) {
-  const view = cur().view;
-  if (["progress", "launching", "running", "boot"].includes(view)) return;
-  if (model.qs) {
-    const apps = filteredApps();
-    if (g === "single") { model.qs = null; return render(0); }
-    if (g === "double") { model.qs.index = (model.qs.index + 1) % apps.length; return render(0); }
-    if (g === "long") { const app = apps[model.qs.index]; model.qs = null; return runApp(app); }
-  }
-  if (view === "guide") {
-    const step = cur().params.step;
-    if (g === "single" && step > 1) return replace("guide", { step: step - 1 });
-    if (g === "double") return step < 4 ? replace("guide", { step: step + 1 }) : onAction("guide:done");
-    return;
-  }
-  if (g === "single") { if (!back()) toast("Press AI twice to switch"); return; }
-  if (g === "double") {
-    const apps = filteredApps();
-    if (!apps.length) return toast("No apps in this list");
-    const currentIndex = apps.findIndex((a) => a.id === model.current);
-    model.qs = { index: (currentIndex + 1) % apps.length };
-    return render(0);
-  }
-  if (g === "long") toast("Press twice, then hold");
-}
-aiKey.addEventListener("pointerdown", (e) => { e.preventDefault(); aiKey.setPointerCapture(e.pointerId); aiDown(); });
+aiKey.addEventListener("pointerdown", (e) => { e.preventDefault(); try { aiKey.setPointerCapture(e.pointerId); } catch (_) {} aiDown(); });
 aiKey.addEventListener("pointerup", aiUp);
 aiKey.addEventListener("pointercancel", aiUp);
 aiKey.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); aiDown(); } });
@@ -982,29 +1411,113 @@ aiKey.addEventListener("keyup", (e) => { if (e.key === "Enter" || e.key === " ")
 const powerKey = document.getElementById("powerKey");
 let lastPower = 0;
 powerKey.addEventListener("click", () => {
-  const now = performance.now();
-  const isDouble = now - lastPower < 450;
+  const now = performance.now(), isDouble = now - lastPower < 450;
   lastPower = now;
   powerKey.classList.add("on"); setTimeout(() => powerKey.classList.remove("on"), 150);
   if (isDouble && ai.down) enterVibeMode(true);
-  else if (isDouble) note("双击开关机键会重启设备；进入 Vibe Mode 需要同时按住右上角 AI 键（键盘 ↑）。");
+  else if (isDouble) note("双击开关机键只会重启设备；要回到 Vibe Mode，请同时按住 AI 键（键盘 ↑）。");
 });
 function enterVibeMode(heldAI) {
-  cancelJob(); model.qs = null; model.running = null; toastText = "";
+  cancelJob(); clearInterval(resultTimer);
+  model.qs = null; model.drawer = false; hideToast();
   stack = [{ view: "boot", params: {} }]; render(0);
   ai.bootHold = heldAI && ai.down;
   setTimeout(() => {
     stack = model.guideDone ? [{ view: "home", params: {} }] : [{ view: "guide", params: { step: 1 } }];
     render(1);
-    note(ai.bootHold ? "已进入 Vibe Mode：松开 AI 键前不识别按键，避免把进入手势误判为操作。" : "已回到 Vibe Mode。");
+    if (model.guideDone && updateIds().length) setTimeout(() => toast(`${updateIds().length} updates · tap to see`, "go:updates"), 400);
+    note(ai.bootHold ? "已进入 Vibe Mode：松开 AI 键前不响应按键，避免把进入手势误判为“返回”。" : "已回到 Vibe Mode。");
   }, 900);
 }
 
-/* Keyboard: ↑ is the AI key; digits and letters reach the keypad and keyboard pages. */
+/* ---------------- Touch gestures ----------------
+   Edge swipe = Back (the page follows the finger); vertical drag scrolls lists
+   with a mouse, flips the detail pages and pulls the Browse sheet down. */
+let gst = null, eatClickUntil = 0;
+function gestureEatsClick() { return performance.now() < eatClickUntil; }
+function toScreen(e) {
+  const r = screen.getBoundingClientRect(), k = r.width / 480;
+  return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k, k };
+}
+screen.addEventListener("pointerdown", (e) => {
+  if (staticMode || e.button > 0) return;
+  const p = toScreen(e);
+  const list = e.target.closest && e.target.closest(".list");
+  const canBack = stack.length > 1 || model.drawer || (cur().view === "detail" && model.detail.page === 2);
+  gst = { id: e.pointerId, x0: p.x, y0: p.y, t0: performance.now(), axis: null, list, top: list ? list.scrollTop : 0,
+          edge: p.x <= I.edge_back_start_px && canBack && !model.qs && !["progress", "running", "launching", "boot"].includes(cur().view),
+          sheet: model.drawer && p.y > 104, moved: false };
+}, true);
+screen.addEventListener("pointermove", (e) => {
+  if (!gst || gst.id !== e.pointerId) return;
+  const p = toScreen(e), dx = p.x - gst.x0, dy = p.y - gst.y0;
+  if (!gst.axis && Math.hypot(dx, dy) > 8) gst.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+  if (!gst.axis) return;
+  gst.moved = true;
+  if (gst.axis === "x" && gst.edge && pageLayer) {
+    pageLayer.style.transition = "none";
+    pageLayer.style.transform = `translateX(${Math.max(0, dx)}px)`;
+  } else if (gst.axis === "y") {
+    if (gst.sheet) {
+      const sheet = pageLayer.querySelector('[data-overlay="sheet"]');
+      if (sheet) { sheet.style.transition = "none"; sheet.style.transform = `translateY(${Math.max(0, dy)}px)`; }
+    } else if (gst.list && e.pointerType === "mouse") {
+      gst.list.scrollTop = gst.top - dy;
+    } else if (cur().view === "detail" && pageLayer) {
+      pageLayer.style.transition = "none";
+      const page = model.detail.page;
+      const limited = page === 1 ? Math.min(0, dy) : Math.max(0, dy);
+      pageLayer.style.transform = `translateY(${limited * 0.35}px)`;
+    }
+  }
+}, true);
+function endGesture(e, cancelled) {
+  if (!gst || gst.id !== e.pointerId) return;
+  const g = gst; gst = null;
+  if (!g.moved) return;
+  eatClickUntil = performance.now() + 80;
+  const p = toScreen(e), dx = p.x - g.x0, dy = p.y - g.y0, dt = Math.max(1, performance.now() - g.t0);
+  const snap = (el) => { if (el) { el.style.transition = `transform 200ms ${EASE}`; el.style.transform = "translate(0,0)"; } };
+  if (g.axis === "x" && g.edge) {
+    if (!cancelled && (dx > I.edge_back_commit_px || dx / dt > I.edge_back_flick_px_ms)) {
+      const leaving = pageLayer;
+      leaving.style.transition = `transform 180ms ${EASE}`;
+      leaving.style.transform = "translateX(480px)";
+      setTimeout(() => { skipSlide = true; if (!back()) { skipSlide = false; snap(leaving); } }, 150);
+    } else snap(pageLayer);
+    return;
+  }
+  if (g.axis !== "y") return;
+  if (g.sheet) {
+    const sheet = pageLayer.querySelector('[data-overlay="sheet"]');
+    if (!cancelled && (dy > 80 || dy / dt > 0.5)) return closeDrawer();
+    return snap(sheet);
+  }
+  if (cur().view === "detail" && !g.list) {
+    snap(pageLayer);
+    if (cancelled) return;
+    if (dy < -I.page_swipe_px && model.detail.page === 1) setDetailPage(2);
+    else if (dy > I.page_swipe_px && model.detail.page === 2) setDetailPage(1);
+  }
+}
+screen.addEventListener("pointerup", (e) => endGesture(e, false), true);
+screen.addEventListener("pointercancel", (e) => endGesture(e, true), true);
+let wheelAt = 0;
+screen.addEventListener("wheel", (e) => {
+  if (staticMode || cur().view !== "detail" || e.target.closest(".list")) return;
+  e.preventDefault();
+  const now = performance.now();
+  if (now - wheelAt < 600 || Math.abs(e.deltaY) < 12) return;
+  wheelAt = now;
+  setDetailPage(e.deltaY > 0 ? 2 : 1);
+}, { passive: false });
+
+/* Computer keyboard: ↑ is the AI key; Esc is Back; digits and letters reach the keypad and keyboard pages. */
 document.addEventListener("keydown", (e) => {
   if (e.target.closest && e.target.closest(".panel, .gallery, .static-bar")) return;
   if (e.key === "ArrowUp") { if (!e.repeat) aiDown(); e.preventDefault(); return; }
   if (staticMode) return;
+  if (e.key === "Escape") { back(); return; }
   const view = cur().view;
   if (view === "download") {
     if (/^[0-9]$/.test(e.key)) onAction(`key:${e.key}`);
@@ -1014,82 +1527,126 @@ document.addEventListener("keydown", (e) => {
     if (e.key.length === 1) onAction(`kb:${e.key}`);
     else if (e.key === "Backspace") onAction("kb:del");
     else if (e.key === "Enter") onAction("kb:go");
+    else return;
+    e.preventDefault();
   }
 });
 document.addEventListener("keyup", (e) => { if (e.key === "ArrowUp") { aiUp(); e.preventDefault(); } });
 
 /* ---------------- Panel ---------------- */
+const CHECKS = [
+  ["首页", "点 <b>My apps</b> 打开底部面板，选 Favorites；再下拉面板或点上方空白处关闭。"],
+  ["快速切换", "在首页连按两次 <b>AI</b>（键盘 ↑），单击 AI 换下一个，按住 0.6 秒打开；或等 4 秒自动关闭。"],
+  ["返回", "进入任意子页后单击 AI 立即返回；再从屏幕左边缘向右拖动返回，拖不够远会弹回。"],
+  ["详情两屏", "打开一个应用，点 <b>About this app</b> 或上滑进入第二屏，下滑回到第一屏。"],
+  ["长按删除", "在详情第二屏按住 <b>Hold to delete</b>：0.6 秒内松开会取消；删除后回到首页，列表位置不变。"],
+  ["下载", "Download 输入 <b>238114</b> → Go → Download &amp; open，看下载、切换和 3 秒倒计时。"],
+  ["离线续接", "关闭“Wi‑Fi 已连接”，再查询 238114：会转到 Wi‑Fi，连 Maker Lab（密码至少 8 位，<b>wrongpass</b> 会报错），连上后自动继续查询。"],
+  ["后台更新", "首页点状态栏的 <b>↑ 2</b> 横幅或 Device → App updates → Update all，返回首页看 <b>↓ 1/2</b>。"],
+  ["存储", "打开“存储空间不足”，查询 507219：主按钮变为 Free up space；在 App storage 点一行进入删除。"],
+  ["Mosaico AI", "Device → Mosaico AI：长按关闭，再点 Turn on（离线时会先去 Wi‑Fi，连上后自动开启）。"],
+  ["低电量", "打开“低电量”，在首页打开一个非当前应用，出现 Battery low 结果页。"],
+  ["回到 Vibe Mode", "点“Agent 通过 USB 安装应用”看安装进度；应用运行后按住 AI，同时双击开关机键。"],
+  ["首次引导", "点“首次进入”，走完 5 步；最后一步 Connect 直接进入 Wi‑Fi。"],
+];
+const checksEl = document.getElementById("checks");
+const doneSet = new Set(JSON.parse(localStorage.getItem("vibe-checks") || "[]"));
+function renderChecks() {
+  checksEl.replaceChildren();
+  CHECKS.forEach(([title, html], i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<label><input type="checkbox" ${doneSet.has(i) ? "checked" : ""}><span><b>${title}</b>　${html}</span></label>`;
+    li.querySelector("input").addEventListener("change", (e) => {
+      if (e.target.checked) doneSet.add(i); else doneSet.delete(i);
+      localStorage.setItem("vibe-checks", JSON.stringify([...doneSet]));
+      document.getElementById("checkCount").textContent = `${doneSet.size}/${CHECKS.length}`;
+    });
+    checksEl.appendChild(li);
+  });
+  document.getElementById("checkCount").textContent = `${doneSet.size}/${CHECKS.length}`;
+}
+document.getElementById("checksReset").addEventListener("click", () => { doneSet.clear(); localStorage.removeItem("vibe-checks"); renderChecks(); });
+renderChecks();
+
 const idList = document.getElementById("idList");
 for (const [id, text] of TRY_IDS) {
   const b = document.createElement("button");
   b.type = "button"; b.textContent = id;
   b.addEventListener("click", () => {
     if (staticMode) exitStatic();
-    model.qs = null; model.dl = { digits: id, looking: false };
+    model.qs = null; model.drawer = false; model.dl = { digits: id, looking: false, error: "" };
     stack = [{ view: "home", params: {} }, { view: "download", params: {} }]; render(1);
   });
   const s = document.createElement("span"); s.textContent = text;
   idList.append(b, s);
 }
+const SIMS = {
+  simWifi: () => [model.wifi.connected, "Wi‑Fi 已连接", "Wi‑Fi 未连接"],
+  simUsb: () => [model.usb, "USB 数据线已插入", "USB 数据线未插入"],
+  simAgent: () => [model.agent, "AI Agent 已连接", "AI Agent 未连接"],
+  simFail: () => [model.failNext, "下一次下载会失败", "下一次下载会失败"],
+  simLowBat: () => [model.lowBattery, "低电量", "低电量"],
+  simStorage: () => [model.storageFull, "存储空间不足", "存储空间不足"],
+};
 function syncSim() {
-  const a = document.getElementById("simAgent"), u = document.getElementById("simUsb"), w = document.getElementById("simWifi");
-  a.setAttribute("aria-pressed", String(model.agent)); a.textContent = model.agent ? "AI Agent 已连接" : "AI Agent 未连接";
-  u.setAttribute("aria-pressed", String(model.usb)); u.textContent = model.usb ? "USB 数据线已插入" : "USB 数据线未插入";
-  w.setAttribute("aria-pressed", String(model.wifi.connected)); w.textContent = model.wifi.connected ? "Wi‑Fi 已连接" : "Wi‑Fi 未连接";
+  for (const [id, f] of Object.entries(SIMS)) {
+    const [on, a, b] = f(), el = document.getElementById(id);
+    el.setAttribute("aria-pressed", String(on)); el.textContent = on ? a : b;
+  }
 }
-document.getElementById("simAgent").addEventListener("click", () => {
-  model.agent = !model.agent; syncSim();
-  if (!staticMode) { if (model.agent) toast("AI agent connected"); else render(0); }
-});
-document.getElementById("simUsb").addEventListener("click", () => { model.usb = !model.usb; syncSim(); if (!staticMode) render(0); });
+const live = () => { if (!staticMode) render(0); };
 document.getElementById("simWifi").addEventListener("click", () => {
-  model.wifi = model.wifi.connected ? { connected: false, ssid: "", ip: "" } : { connected: true, ssid: "Studio-5G", ip: "192.168.1.20" };
-  syncSim(); if (!staticMode) render(0);
+  if (model.wifi.connected) model.wifi = { connected: false, ssid: "", ip: "", connecting: "" };
+  else {
+    model.wifi = { connected: true, ssid: "Studio-5G", ip: "192.168.1.20", connecting: "" };
+    if (model.tokenKind === "none" && !model.aiOptOut) model.tokenKind = "mosaico";
+  }
+  syncSim(); live();
 });
+document.getElementById("simUsb").addEventListener("click", () => { model.usb = !model.usb; if (!model.usb) model.agent = false; syncSim(); live(); });
+document.getElementById("simAgent").addEventListener("click", () => {
+  model.agent = !model.agent; if (model.agent) model.usb = true; syncSim(); live();
+  if (model.agent && !staticMode) toast("AI agent connected");
+});
+document.getElementById("simFail").addEventListener("click", () => { model.failNext = !model.failNext; syncSim(); });
+document.getElementById("simLowBat").addEventListener("click", () => { model.lowBattery = !model.lowBattery; syncSim(); live(); });
+document.getElementById("simStorage").addEventListener("click", () => { model.storageFull = !model.storageFull; syncSim(); live(); });
 document.getElementById("simDeploy").addEventListener("click", () => {
   if (staticMode) exitStatic();
-  model.qs = null; model.agent = true; model.usb = true; syncSim();
-  const app = { id: "agent", name: "hello_world", version: "0.2.1", size: "2.85 MB" };
+  model.qs = null; model.drawer = false; model.agent = true; model.usb = true; syncSim();
+  const app = { id: "agent", name: "hello_world", version: "0.2.1", size: "2.85 MB", category: "other", official: false };
   stack = [{ view: "home", params: {} }];
   runProgress({ kind: "agent", caption: "FROM YOUR AI AGENT · USB", title: "Installing your app", detail: "hello_world · v0.2.1",
-    total: 2.85, rate: "236 KB/s", step: "Step 1 of 2 · Receiving", steps: ["Step 1 of 2 · Receiving", "Step 2 of 2 · Checking"] }, 5200, () => {
+    total: 2.85, rate: "236 KB/s", step: "Step 1 of 2 · Receiving", steps: ["Step 1 of 2 · Receiving", "Step 2 of 2 · Checking"] }, 4200, () => {
     model.current = null;
-    showResult({ kind: "installed", title: "App installed", caption: "hello_world · v0.2.1", detail: "Restarting into your app…" });
-    setTimeout(() => { if (cur().view === "result") launch(app, true); }, 1500);
+    showResult({ kind: "installed", caption: "hello_world · v0.2.1", app });
   });
-  note("模拟：AI Agent 通过 USB 下发 hello_world，屏幕显示进度而不是黑屏。");
+  note("模拟：AI Agent 通过 USB 安装 hello_world；屏幕显示进度，而不是黑屏。");
 });
 document.getElementById("simGuide").addEventListener("click", () => {
   if (staticMode) exitStatic();
-  model.guideDone = false; model.qs = null; enterVibeMode(false);
+  model.guideDone = false; enterVibeMode(false);
 });
 document.getElementById("simReset").addEventListener("click", () => {
   if (staticMode) exitStatic();
-  cancelJob(); model = freshModel(); kbMode = "lower"; toastText = ""; stack = [{ view: "home", params: {} }];
+  cancelJob(); clearInterval(resultTimer); clearInterval(bgTimer); clearTimeout(ai.idleTimer);
+  model = freshModel(); kbMode = "lower"; hideToast(); stack = [{ view: "home", params: {} }];
   syncSim(); render(-1); note("原型已重置。");
 });
 
 /* ---------------- Gallery and static preview ---------------- */
 const staticBar = document.getElementById("staticBar");
-function staticLayer(state) {
-  const layer = buildLayer(state.objects, null, null);
-  // Static screens keep their baked list rows, clipped to their viewports.
-  for (const o of state.objects) if (o.row_of) {
-    const n = renderObj(o, null);
-    const [cx, cy, cw, ch] = o.clip;
-    n.style.clipPath = `inset(${Math.max(0, cy - o.y)}px ${Math.max(0, o.x + o.w - cx - cw)}px ${Math.max(0, o.y + o.h - cy - ch)}px ${Math.max(0, cx - o.x)}px)`;
-    layer.appendChild(n);
-  }
-  return layer;
-}
 function showStatic(state) {
+  saveScroll(pageLayer);
+  hideToast();
   staticMode = true;
   staticBar.classList.add("show");
   document.getElementById("staticName").textContent = state.title;
-  screen.replaceChildren(staticLayer(state));
+  screen.replaceChildren(buildLayer(state.objects, null, null));
+  pageLayer = null;
   screen.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
-function exitStatic() { staticMode = false; staticBar.classList.remove("show"); render(0); }
+function exitStatic() { staticMode = false; staticBar.classList.remove("show"); screen.replaceChildren(); render(0); }
 document.getElementById("staticExit").addEventListener("click", exitStatic);
 const thumbs = document.getElementById("thumbs");
 for (const state of LAYOUT.states) {
@@ -1097,7 +1654,7 @@ for (const state of LAYOUT.states) {
   b.type = "button"; b.className = "thumb";
   const mini = document.createElement("div"); mini.className = "mini";
   const inner = document.createElement("div"); inner.className = "screen-static";
-  inner.appendChild(staticLayer(state));
+  inner.appendChild(buildLayer(state.objects, null, null));
   mini.appendChild(inner);
   const cap = document.createElement("span"); cap.textContent = state.title;
   b.append(mini, cap);
@@ -1109,14 +1666,12 @@ document.getElementById("galleryNote").textContent =
 
 /* ---------------- Fit the device to narrow screens ---------------- */
 const fit = document.getElementById("deviceFit"), scaleBox = document.getElementById("deviceScale");
-// Approximate real size: the 2.1-inch screen is 37.7 mm wide. CSS millimetres
-// match physical ones only roughly, depending on the monitor.
 let physical = false;
-const mmProbe = Object.assign(document.createElement("div"), { style: "position:absolute;visibility:hidden;width:37.7mm" });
+const mmProbe = Object.assign(document.createElement("div"), { style: "position:absolute;visibility:hidden;width:38.8mm" });
 document.body.appendChild(mmProbe);
 document.getElementById("simPhysical").addEventListener("click", (e) => {
   physical = !physical; e.currentTarget.setAttribute("aria-pressed", String(physical)); fitDevice();
-  note(physical ? "屏幕已按 37.7 mm 宽显示（按 CSS 毫米近似，不同显示器会有偏差）。" : "已恢复放大显示。");
+  note(physical ? "屏幕按 38.8 mm 宽显示（CSS 毫米只是近似，不同显示器会有偏差）。" : "已恢复放大显示。");
 });
 function fitDevice() {
   const s = physical ? mmProbe.offsetWidth / 480 : Math.min(1, fit.clientWidth / 560);
@@ -1127,4 +1682,6 @@ new ResizeObserver(fitDevice).observe(fit);
 fitDevice();
 syncSim();
 render(0);
+setTimeout(() => { if (cur().view === "home" && updateIds().length) toast(`${updateIds().length} updates · tap to see`, "go:updates"); }, 700);
 </script>
+</html>

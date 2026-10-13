@@ -13,7 +13,8 @@ CATEGORIES = [
     ("audio", "Audio", "audio"),
     ("smart-home", "Smart home", "house"),
     ("sensors", "Sensors", "sensor"),
-    ("communication", "Communication", "chat"),
+    # "Communication" does not fit a 136 px Browse tile; "Chat" is the on-device label.
+    ("communication", "Chat", "chat"),
     ("motor", "Motor", "motor"),
 ]
 CATEGORY_LABEL = {key: label for key, label, _ in CATEGORIES}
@@ -73,6 +74,8 @@ PRESETS = [
 ]
 FAVORITES = ["100001", "100009", "100015"]
 CURRENT = "100001"
+# Most-recently-used order (excluding CURRENT). Home lists CURRENT first, then these.
+RECENT = ["100009", "100015", "100006", "100012", "100002"]
 
 # Apps that exist only in the store (prototype lookups and mockups).
 STORE_ONLY = [
@@ -82,6 +85,11 @@ STORE_ONLY = [
          "Roll up to six dice with a shake animation. Great for board games.", official=False),
 ]
 # Newer store versions of presets, to show "Update available".
-STORE_UPDATES = {"100006": "1.1.0"}
+STORE_UPDATES = {"100006": "1.1.0", "100009": "2.1.0"}
+
+# Shared NAND budget used by STORAGE and the "not enough space" result.
+NAND_CAPACITY_MB = 64.0
+# Sample shared AI token kind: "mosaico" | "own" | "none".
+AI_TOKEN_KIND = "mosaico"
 
 QR_APPS = PRESETS + STORE_ONLY

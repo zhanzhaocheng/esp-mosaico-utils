@@ -2,13 +2,14 @@
 """Regenerate the Vibe Mode 0.3 design assets: font subsets, icons and QR codes.
 
 Design tooling only; firmware builds do not run this script. Requirements:
-Pillow, fonttools and qrcode (``pip install pillow fonttools qrcode``).
+Pillow, fonttools, brotli and qrcode
+(``pip install pillow 'fonttools[woff]' brotli qrcode``).
 
-Font sources are the OFL variable fonts from https://github.com/google/fonts:
-``ofl/doto/Doto[ROND,wght].ttf`` and ``ofl/notosanssc/NotoSansSC[wght].ttf``
-(checked against google/fonts commit bd8f81ddb5c74d5c8897b36ad88b440266245103).
-Pass the checkout root with ``--google-fonts``; icons and QR codes need no
-external input. Each output is deterministic for the same tool versions.
+Display/text fonts come from the Mosaico UI OFL woff2 sources (Archivo Extended
+and Inter). Pass ``--mosaico-fonts`` or rely on the default path next to this
+repo. Optional ``--google-fonts`` still builds Noto Sans SC for the Chinese
+phase. Icons and QR codes need no external input. Each output is deterministic
+for the same tool versions.
 
 QR codes are written at one pixel per module (33 x 33 px for version 3 with a
 2-module quiet zone). Layouts scale them by an integer factor with
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import shutil
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -26,6 +28,8 @@ from sample_data import QR_APPS
 
 DESIGN = Path(__file__).resolve().parents[1]
 ASSETS = DESIGN / "assets"
+DEFAULT_MOSAICO_FONTS = Path(
+    "/Users/zhanzhaocheng/project/esp-mosaico/design/mosaico-ui/src/assets/fonts")
 
 WHITE = (242, 242, 242)
 GREY = (154, 154, 154)
@@ -36,8 +40,10 @@ ORANGE = (255, 76, 1)
 # ASCII plus the few symbols the English design uses. The Chinese phase only
 # extends NOTO_EXTRA with its fixed CJK copy; the fonts themselves stay.
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
-NOTO_EXTRA = "·•…—–‹›→←↑↓×°✓●○★☆"
-DOTO_EXTRA = "·•…—–×°"
+# Archivo and Inter have no arrows other than ↑↓ and no check, star or circle
+# glyphs; the layouts draw those as icons or containers instead.
+LATIN_EXTRA = "·•…—–‹›↑↓×°"
+NOTO_EXTRA = LATIN_EXTRA
 
 # QR payloads. "develop" is the official vibe-coding guide; the help links are
 # placeholders the website can redirect until the documentation URLs are
@@ -82,7 +88,13 @@ def _subset(font, text: str):
 
 
 def _metrics(font, ascent: int, descent: int) -> None:
-    """Use tight, identical vertical metrics so GSP label heights are predictable."""
+    """Use tight, identical vertical metrics so GSP label heights are predictable.
+
+    ``ascent`` and ``descent`` are per mille of the em; Inter has 2048 units
+    per em, Archivo 1000, so they are scaled to the font's own units.
+    """
+    upm = font["head"].unitsPerEm
+    ascent, descent = round(ascent * upm / 1000), round(descent * upm / 1000)
     font["hhea"].ascent = ascent
     font["hhea"].descent = -descent
     font["hhea"].lineGap = 0
@@ -108,25 +120,42 @@ def _names(font, family: str, style: str) -> None:
         table.setName(value, name_id, 1, 0, 0)
 
 
-def build_fonts(google_fonts: Path) -> None:
+def build_latin_fonts(mosaico_fonts: Path) -> None:
+    """Archivo Extended (display) and Inter (text) from mosaico-ui woff2."""
     out = ASSETS / "fonts"
     out.mkdir(parents=True, exist_ok=True)
-    doto = google_fonts / "ofl/doto/Doto[ROND,wght].ttf"
+    archivo = mosaico_fonts / "Archivo-Extended-Variable-latin.woff2"
+    inter = mosaico_fonts / "Inter-Variable-latin.woff2"
+    # Archivo Extended woff2 is already the extended width (no wdth axis).
+    for style, weight in (("Medium", 500), ("SemiBold", 600)):
+        font = _subset(_instance(archivo, {"wght": weight}), ASCII + LATIN_EXTRA)
+        _metrics(font, 900, 250)
+        _names(font, "Archivo Extended Vibe", style)
+        font.save(out / f"ArchivoExtended-{style}.subset.ttf")
+    font = _subset(_instance(inter, {"wght": 400}), ASCII + LATIN_EXTRA)
+    _metrics(font, 950, 250)
+    _names(font, "Inter Vibe", "Regular")
+    font.save(out / "Inter-Regular.subset.ttf")
+    for src_name, dst_name in (("LICENSE-Archivo.txt", "OFL-Archivo.txt"),
+                               ("LICENSE-Inter.txt", "OFL-Inter.txt")):
+        src = mosaico_fonts / src_name
+        if src.exists():
+            shutil.copy(src, out / dst_name)
+
+
+def build_noto_fonts(google_fonts: Path) -> None:
+    """Optional Noto Sans SC subsets for the Chinese phase."""
+    out = ASSETS / "fonts"
+    out.mkdir(parents=True, exist_ok=True)
     noto = google_fonts / "ofl/notosanssc/NotoSansSC[wght].ttf"
-    font = _subset(_instance(doto, {"ROND": 100, "wght": 900}), ASCII + DOTO_EXTRA)
-    # Doto caps occupy 0..700 units and descenders reach -200.
-    _metrics(font, 800, 200)
-    _names(font, "Doto Vibe", "Black")
-    font.save(out / "Doto-Black.subset.ttf")
     for style, weight in (("Regular", 400), ("Medium", 500)):
         font = _subset(_instance(noto, {"wght": weight}), ASCII + NOTO_EXTRA)
-        # 1.25 em keeps Latin accents and the CJK ideographic box (-120..880).
         _metrics(font, 1000, 250)
         _names(font, "Noto Sans SC Vibe", style)
         font.save(out / f"NotoSansSC-{style}.subset.ttf")
-    for name, source in (("OFL-Doto.txt", doto.with_name("OFL.txt")),
-                         ("OFL-NotoSansSC.txt", noto.with_name("OFL.txt"))):
-        (out / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    ofl = noto.with_name("OFL.txt")
+    if ofl.exists():
+        (out / "OFL-NotoSansSC.txt").write_text(ofl.read_text(encoding="utf-8"), encoding="utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -207,15 +236,6 @@ def _wifi(p: Pen, off: bool = False) -> None:
     p.dot(12, 19.2, 1.6)
     if off:
         p.line([(4.5, 4.5), (19.5, 19.5)], 1.9)
-
-
-def _sliders(p: Pen) -> None:
-    p.line([(4, 8), (11.5, 8)])
-    p.line([(18.5, 8), (20, 8)])
-    p.circle(15, 8, 2.6)
-    p.line([(4, 16), (5.5, 16)])
-    p.line([(12.5, 16), (20, 16)])
-    p.circle(9, 16, 2.6)
 
 
 def _question(p: Pen) -> None:
@@ -329,7 +349,6 @@ ICONS = {
                           p.line([(4, 4), (20, 20)])),
     "wifi": _wifi,
     "wifi_off": lambda p: _wifi(p, True),
-    "settings": _sliders,
     "help": _question,
     "robot": _robot,
     "usb": _usb,
@@ -384,40 +403,227 @@ ICONS = {
     "replay": lambda p: (p.arc(12, 12.5, 7.5, 270, 570, 2.0),
                          p.line([(14.8, 2.0), (12, 5.0), (14.8, 8.0)], 2.0)),
 }
+ICONS.update({
+    "clock": lambda p: (p.circle(12, 12, 8.6, 1.8), p.line([(12, 7.2), (12, 12), (15.6, 14.2)], 1.8)),
+    "lock": lambda p: (p.rrect(5.5, 10.5, 18.5, 20, 2.2, 1.8), p.arc(12, 9.5, 4.2, 180, 360, 1.8),
+                       p.line([(7.8, 9.5), (7.8, 10.6)], 1.8), p.line([(16.2, 9.5), (16.2, 10.6)], 1.8)),
+    "page_download": ICONS["download"],
+    "page_develop": ICONS["code"],
+    "page_device": ICONS["chip"],
+    "page_help": ICONS["help"],
+    "page_updates": ICONS["refresh"],
+    "page_storage": ICONS["storage"],
+    "page_wifi": ICONS["wifi"],
+})
 
 
-def _empty_grid(size: int, color) -> Image.Image:
-    """3x3 dot-matrix tile used for the empty library state."""
-    pen = Pen(size)
-    for row in range(3):
-        for col in range(3):
-            filled = (row, col) in ((0, 0), (1, 1), (2, 2), (0, 2))
-            x, y = 5 + col * 7, 5 + row * 7
-            if filled:
-                pen.rrect(x - 2.6, y - 2.6, x + 2.6, y + 2.6, 1.2, None)
-            else:
-                pen.rrect(x - 2.3, y - 2.3, x + 2.3, y + 2.3, 1.2, 1.2)
-    return pen.result(color)
-
-
-# (icon, size px, color name). Sizes match their on-screen boxes exactly.
+# (icon, size px, color name). Sizes match their on-screen boxes exactly; the
+# list holds only what layouts or the prototype's runtime swaps reference.
+_BROWSE = ("grid", "clock", "star", "display", "audio", "house", "sensor", "chat", "motor")
 ICON_OUTPUTS = [
-    # 28 px: status strip, list chevrons, keyboard function keys, inline hints.
-    ("chevron", 28, "dim"), ("chevron_down", 28, "white"), ("wifi", 28, "white"), ("wifi_off", 28, "grey"),
-    ("robot", 28, "orange"), ("robot", 28, "grey"), ("battery_full", 28, "white"), ("battery_mid", 28, "white"),
-    ("battery_low", 28, "orange"), ("battery_charging", 28, "white"), ("expand", 28, "grey"),
-    ("power", 28, "orange"), ("back", 28, "white"), ("backspace", 28, "white"),
-    # 32 px: every icon inside a button or a row.
-    *[(name, 32, "white") for name in ("back", "help", "settings", "star", "qr", "replay", "refresh", "download",
-                                       "code", "share", "usb", "trash", "info", "close", "backspace", "arrow",
-                                       "eye", "eye_off", "grid", "display", "audio", "house", "sensor", "chat",
-                                       "motor", "flag", "hash", "support")],
-    ("star_fill", 32, "orange"), ("download", 32, "black"), ("play", 32, "black"), ("trash", 32, "orange"),
-    *[(name, 32, "grey") for name in ("wifi", "pin", "key", "chip", "id", "storage")],
-    # 48 px: result ring.
-    ("check", 48, "orange"), ("close", 48, "grey"),
+    # 20 px: inline icons beside text and row chevrons (spec minimum).
+    *[(name, 20, "white") for name in ("wifi", "pin", "robot", "refresh", "storage", "key", "info", "qr",
+                                       "flag", "code", "hash", "support", "chevron_down")],
+    *[(name, 20, "grey") for name in ("lock", "wifi", "usb", "qr", "star_fill")],
+    ("usb", 20, "orange"), ("chevron", 20, "dim"), ("chevron_down", 20, "dim"),
+    # 28 px: status strip and keyboard function keys.
+    ("wifi", 28, "white"), ("wifi_off", 28, "grey"), ("robot", 28, "orange"), ("robot", 28, "grey"),
+    ("battery_full", 28, "white"), ("battery_mid", 28, "white"), ("battery_low", 28, "orange"),
+    ("battery_charging", 28, "white"), ("back", 28, "white"), ("backspace", 28, "white"),
+    # 32 px: icons inside buttons, cards and page titles.
+    *[(name, 32, "white") for name in ("back", "help", "chip", "star", "qr", "refresh", "download", "code",
+                                       "share", "usb", "backspace", "eye", "eye_off", *_BROWSE)],
+    *[(name, 32, "black") for name in ("download", "play", "storage", "refresh", "wifi", "robot")],
+    *[(name, 32, "orange") for name in ("star_fill", "trash", "power", "wifi", "wifi_off", "download", "code",
+                                        *_BROWSE)],
+    ("wifi_off", 32, "grey"), ("usb", 32, "grey"),
+    *[(name, 32, "orange") for name in ("page_download", "page_develop", "page_device", "page_help")],
 ]
 COLORS = {"white": WHITE, "grey": GREY, "dim": DIM, "black": BLACK, "orange": ORANGE}
+
+# Dot-matrix pictograms on a 7 x 7 grid: '#' white dot, 'o' orange accent dot,
+# '.' an unlit dot. Every pictogram reads as one object at 56 px and above.
+PICTOGRAMS = {
+    # Categories (app tiles).
+    "display": ["#######",
+                "#.....#",
+                "#.o.#.#",
+                "#.....#",
+                "#######",
+                "...#...",
+                ".#####."],
+    "audio": [".......",
+              "....o..",
+              ".#..#..",
+              ".#..#.#",
+              ".#.##.#",
+              "##.##.#",
+              "##.####"],
+    "smart-home": ["...o...",
+                   "..#.#..",
+                   ".#...#.",
+                   "#######",
+                   ".#...#.",
+                   ".#.#.#.",
+                   ".#####."],
+    "sensors": [".......",
+                "..###..",
+                ".#...#.",
+                "#...#.#",
+                "#..o..#",
+                "#.....#",
+                "......."],
+    "communication": [".#####.",
+                      "#######",
+                      "##.#.##",
+                      "#######",
+                      ".#####.",
+                      ".#o....",
+                      ".#....."],
+    "motor": ["..#.#..",
+              ".#####.",
+              "###.###",
+              "##.o.##",
+              "###.###",
+              ".#####.",
+              "..#.#.."],
+    "community": [".......",
+                  ".o...#.",
+                  ".......",
+                  "###.###",
+                  "###.###",
+                  "###.###",
+                  "......."],
+    "other": [".......",
+              ".......",
+              ".......",
+              ".#.#.o.",
+              ".......",
+              ".......",
+              "......."],
+    # Brand and guide.
+    "vibe": ["#.....#",
+             "#.....#",
+             ".#...#.",
+             ".#...#.",
+             "..#.#..",
+             "..#.#..",
+             "...o..."],
+    "wifi": [".......",
+             "..###..",
+             ".#...#.",
+             "#.###.#",
+             "..#.#..",
+             "...o...",
+             "......."],
+    # Results and empty states.
+    "check": [".......",
+              "......#",
+              ".....#.",
+              "#...#..",
+              ".#.#...",
+              "..o....",
+              "......."],
+    "saved": ["...#...",
+              "...#...",
+              ".#.#.#.",
+              "..###..",
+              "...o...",
+              "#.....#",
+              "#######"],
+    "cross": [".......",
+              ".#...#.",
+              "..#.#..",
+              "...o...",
+              "..#.#..",
+              ".#...#.",
+              "......."],
+    "full": ["#######",
+             "#..#..#",
+             "#..#..#",
+             "#..#..#",
+             "#.....#",
+             "#..o..#",
+             "#######"],
+    "battery": [".......",
+                "######.",
+                "#....##",
+                "#o...##",
+                "#....##",
+                "######.",
+                "......."],
+    "empty": ["...o...",
+              ".......",
+              ".......",
+              "#.....#",
+              "#.....#",
+              "#######",
+              "......."],
+    "star": ["...#...",
+             "..###..",
+             "#######",
+             ".##o##.",
+             "..###..",
+             ".##.##.",
+             ".#...#."],
+    "folder": [".......",
+               "###....",
+               "#######",
+               "#.....#",
+               "#..o..#",
+               "#######",
+               "......."],
+}
+TILE_BG = (38, 38, 38)
+UNLIT_ON_TILE = (54, 54, 54)
+UNLIT_ON_BLACK = (30, 30, 30)
+
+
+def _pictogram(size: int, key: str, tile: bool) -> Image.Image:
+    """Render one pictogram; tiles get the rounded TILE square behind the dots."""
+    ss = 4
+    big = size * ss
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    pad = big * (0.16 if tile else 0.06)
+    if tile:
+        draw.rounded_rectangle((0, 0, big - 1, big - 1), round(big * 0.25), fill=(*TILE_BG, 255))
+    pitch = (big - 2 * pad) / 7
+    r = pitch * 0.36
+    for row, cells in enumerate(PICTOGRAMS[key]):
+        for col, cell in enumerate(cells):
+            cx, cy = pad + (col + 0.5) * pitch, pad + (row + 0.5) * pitch
+            color = {"#": WHITE, "o": ORANGE}.get(cell, UNLIT_ON_TILE if tile else UNLIT_ON_BLACK)
+            draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(*color, 255))
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def _ring_frames(size: int, frames: int = 8) -> list[Image.Image]:
+    """Eight dots in a ring; the orange dot walks around (busy)."""
+    out = []
+    ss = 4
+    for f in range(frames):
+        big = size * ss
+        img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        ring_r, r = big * 0.34, big * 0.085
+        for i in range(8):
+            a = math.radians(-90 + i * 45)
+            cx, cy = big / 2 + ring_r * math.cos(a), big / 2 + ring_r * math.sin(a)
+            lag = (f - i) % 8
+            color = ORANGE if lag == 0 else WHITE if lag < 3 else (70, 70, 70)
+            draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(*color, 255))
+        out.append(img.resize((size, size), Image.LANCZOS))
+    return out
+
+
+# (pictogram, size, tile?) — every size is the exact on-screen box.
+PICTOGRAM_OUTPUTS = [
+    *[(key, size, True) for key in ("display", "audio", "smart-home", "sensors", "communication", "motor",
+                                     "community", "other") for size in (56, 96, 120)],
+    *[(key, 120, False) for key in ("vibe", "wifi", "check", "saved", "cross", "full", "battery")],
+    *[(key, 80, False) for key in ("empty", "star", "folder")],
+]
 
 
 def build_icons() -> None:
@@ -429,8 +635,35 @@ def build_icons() -> None:
         pen = Pen(size)
         ICONS[name](pen)
         pen.result(COLORS[color]).save(out / f"{name}-{size}-{color}.png", optimize=True)
-    _empty_grid(56, GREY).save(out / "empty-56-grey.png", optimize=True)
+    pics = ASSETS / "mosaic"
+    pics.mkdir(parents=True, exist_ok=True)
+    for stale in pics.glob("*.png"):
+        stale.unlink()
+    for key, size, tile in PICTOGRAM_OUTPUTS:
+        kind = "tile" if tile else "hero"
+        _pictogram(size, key, tile).save(pics / f"{kind}_{key}-{size}.png", optimize=True)
+    anim = ASSETS / "anim"
+    anim.mkdir(parents=True, exist_ok=True)
+    for stale in anim.glob("*.png"):
+        stale.unlink()
+    for size in (32, 64):
+        for i, frame in enumerate(_ring_frames(size)):
+            frame.save(anim / f"spin{size}-{i:02d}.png", optimize=True)
 
+
+def build_ui() -> None:
+    """Fade over a cut-off list row, and a transparent placeholder for row badges."""
+    out = ASSETS / "ui"
+    out.mkdir(parents=True, exist_ok=True)
+    for stale in out.glob("*.png"):
+        stale.unlink()
+    w, h = 448, 24
+    fade = Image.new("RGBA", (w, h), (*BLACK, 0))
+    for y in range(h):
+        alpha = round(255 * ((y + 1) / h) ** 1.4)
+        ImageDraw.Draw(fade).line([(0, y), (w - 1, y)], fill=(*BLACK, alpha))
+    fade.save(out / "list-fade.png", optimize=True)
+    Image.new("RGBA", (20, 20), (0, 0, 0, 0)).save(out / "blank-20.png", optimize=True)
 
 # --------------------------------------------------------------------------
 # QR codes: version 3, ECC L, 2-module quiet zone, one pixel per module
@@ -456,12 +689,19 @@ def build_qr() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--mosaico-fonts", type=Path, default=DEFAULT_MOSAICO_FONTS,
+                        help="mosaico-ui fonts dir with Archivo/Inter woff2 (default: design/mosaico-ui)")
+    parser.add_argument("--skip-fonts", action="store_true",
+                        help="keep committed font subsets; only rebuild icons and QR")
     parser.add_argument("--google-fonts", type=Path,
-                        help="google/fonts checkout root; omit to keep the committed font subsets")
+                        help="google/fonts checkout root; rebuilds Noto Sans SC subsets")
     args = parser.parse_args()
+    if not args.skip_fonts and args.mosaico_fonts and args.mosaico_fonts.exists():
+        build_latin_fonts(args.mosaico_fonts)
     if args.google_fonts:
-        build_fonts(args.google_fonts)
+        build_noto_fonts(args.google_fonts)
     build_icons()
+    build_ui()
     build_qr()
 
 
