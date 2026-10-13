@@ -7,9 +7,10 @@ Pillow, fonttools, brotli and qrcode
 
 Display/text fonts come from the Mosaico UI OFL woff2 sources (Archivo Extended
 and Inter). Pass ``--mosaico-fonts`` or rely on the default path next to this
-repo. Optional ``--google-fonts`` still builds Noto Sans SC for the Chinese
-phase. Icons and QR codes need no external input. Each output is deterministic
-for the same tool versions.
+repo. Chinese text uses Noto Sans CJK SC (OFL) subset to the characters in
+tools/i18n.py; pass ``--cjk-font`` for another copy of NotoSansCJK.ttc, or
+``--skip-cjk`` to keep the committed subsets. Icons and QR codes need no
+external input. Each output is deterministic for the same tool versions.
 
 QR codes are written at one pixel per module (33 x 33 px for version 3 with a
 2-module quiet zone). Layouts scale them by an integer factor with
@@ -30,6 +31,9 @@ DESIGN = Path(__file__).resolve().parents[1]
 ASSETS = DESIGN / "assets"
 DEFAULT_MOSAICO_FONTS = Path(
     "/Users/zhanzhaocheng/project/esp-mosaico/design/mosaico-ui/src/assets/fonts")
+# Launcher icons of the Mosaico apps, used unchanged as the demo Ideas' icons.
+MOSAICO_APP_ICONS = DEFAULT_MOSAICO_FONTS.parent / "app-icons"
+IDEA_ICON_SIZES = (56, 96, 108)
 
 WHITE = (242, 242, 242)
 GREY = (154, 154, 154)
@@ -146,19 +150,35 @@ def build_latin_fonts(mosaico_fonts: Path) -> None:
             shutil.copy(src, out / dst_name)
 
 
-def build_noto_fonts(google_fonts: Path) -> None:
-    """Optional Noto Sans SC subsets for the Chinese phase."""
+DEFAULT_CJK_FONT = Path.home() / "Library/Fonts/NotoSansCJK.ttc"
+CJK_LICENSE = Path("/Users/zhanzhaocheng/project/esp-mosaico/software/demo_coding/demo/hanzi-forest/assets/"
+                   "LICENSE-NotoSansCJK.txt")
+# Noto Sans CJK SC faces in the collection, by style. Vertical metrics match the Latin
+# roles (sans 1.2 em, medium / display 1.15 em) so labels keep one height in both languages.
+CJK_FACES = {"Regular": ("Noto Sans CJK SC", 400, 950), "Medium": ("Noto Sans CJK SC Medium", 500, 900),
+             "Bold": ("Noto Sans CJK SC", 700, 900)}
+
+
+def build_cjk_fonts(collection: Path) -> None:
+    """Noto Sans CJK SC subsets with every character the Chinese UI uses (tools/i18n.py)."""
+    from fontTools.ttLib import TTCollection
+
+    from i18n import cjk_charset
+
     out = ASSETS / "fonts"
-    out.mkdir(parents=True, exist_ok=True)
-    noto = google_fonts / "ofl/notosanssc/NotoSansSC[wght].ttf"
-    for style, weight in (("Regular", 400), ("Medium", 500)):
-        font = _subset(_instance(noto, {"wght": weight}), ASCII + NOTO_EXTRA)
-        _metrics(font, 1000, 250)
+    for stale in out.glob("NotoSansSC-*.subset.*"):
+        stale.unlink()
+    ttc = TTCollection(collection, recalcTimestamp=False)
+    text = ASCII + LATIN_EXTRA + cjk_charset()
+    for style, (family, weight, ascent) in CJK_FACES.items():
+        font = next(f for f in ttc.fonts
+                    if f["name"].getDebugName(1) == family and f["OS/2"].usWeightClass == weight)
+        font = _subset(font, text)
+        _metrics(font, ascent, 250)
         _names(font, "Noto Sans SC Vibe", style)
-        font.save(out / f"NotoSansSC-{style}.subset.ttf")
-    ofl = noto.with_name("OFL.txt")
-    if ofl.exists():
-        (out / "OFL-NotoSansSC.txt").write_text(ofl.read_text(encoding="utf-8"), encoding="utf-8")
+        font.save(out / f"NotoSansSC-{style}.subset.otf")
+    if CJK_LICENSE.exists():
+        shutil.copy(CJK_LICENSE, out / "OFL-NotoSansSC.txt")
 
 
 # --------------------------------------------------------------------------
@@ -484,7 +504,7 @@ ICON_OUTPUTS = [
     # 32 px on list tiles: warm cream (the device body colour) on graphite.
     *[(name, 32, "cream") for name in ("wifi", "usb", "key", "lock", "help", "chip", "flag", "hash", "support",
                                        "id", "storage", "code", "signal_1", "signal_2", "signal_3", "display",
-                                       "rotate")],
+                                       "rotate", "globe")],
     ("trash", 32, "red"), ("wifi_off", 32, "red"),
     # 56 px: the "+ Add Idea" cell at the end of the Ideas pages.
     ("plus", 56, "white"),
@@ -758,6 +778,22 @@ def build_icons() -> None:
         frame.save(anim / f"home-{i:02d}.png", optimize=True)
 
 
+def build_idea_icons() -> None:
+    """Copy each Idea's Mosaico launcher icon (236 px) and only downscale it."""
+    out = ASSETS / "ideas"
+    out.mkdir(parents=True, exist_ok=True)
+    for stale in out.glob("*.png"):
+        stale.unlink()
+    for name in sorted({app["icon"] for app in QR_APPS if app.get("icon")}):
+        src = MOSAICO_APP_ICONS / f"{name}.png"
+        if not src.exists():
+            raise SystemExit(f"missing Mosaico app icon {src}")
+        with Image.open(src) as im:
+            im = im.convert("RGBA")
+            for size in IDEA_ICON_SIZES:
+                im.resize((size, size), Image.LANCZOS).save(out / f"{name}-{size}.png", optimize=True)
+
+
 def build_ui() -> None:
     """Fade over a cut-off list row, and a transparent placeholder for row badges."""
     out = ASSETS / "ui"
@@ -800,14 +836,16 @@ def main() -> None:
                         help="mosaico-ui fonts dir with Archivo/Inter woff2 (default: design/mosaico-ui)")
     parser.add_argument("--skip-fonts", action="store_true",
                         help="keep committed font subsets; only rebuild icons and QR")
-    parser.add_argument("--google-fonts", type=Path,
-                        help="google/fonts checkout root; rebuilds Noto Sans SC subsets")
+    parser.add_argument("--cjk-font", type=Path, default=DEFAULT_CJK_FONT,
+                        help="Noto Sans CJK collection (.ttc); rebuilds the Chinese subsets")
+    parser.add_argument("--skip-cjk", action="store_true", help="keep the committed Chinese subsets")
     args = parser.parse_args()
     if not args.skip_fonts and args.mosaico_fonts and args.mosaico_fonts.exists():
         build_latin_fonts(args.mosaico_fonts)
-    if args.google_fonts:
-        build_noto_fonts(args.google_fonts)
+    if not args.skip_cjk and args.cjk_font and args.cjk_font.exists():
+        build_cjk_fonts(args.cjk_font)
     build_icons()
+    build_idea_icons()
     build_ui()
     build_qr()
 

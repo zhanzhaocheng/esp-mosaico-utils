@@ -1,17 +1,72 @@
-# Vibe Mode 0.3 界面设计与功能定义（阶段 A · 第 10 版）
+# Vibe Mode 0.3 界面设计与功能定义（阶段 A · 第 11 版）
 
 | 项目 | 内容 |
 | --- | --- |
-| 状态 | v10 已实现；本目录只包含设计工具和生成物，**不修改固件** |
+| 状态 | v11 已实现；本目录只包含设计工具和生成物，**不修改固件** |
 | 范围 | 480×480 Vibe Mode：首页、Idea 横向分页、Manage / Idea info / Download / Develop / Settings / Shared info |
-| 语言 | 英文 UI；命名统一为 **Idea** |
-| 页面图 | `mockups/`：69 个页面状态，由 `layout.json`（schema `vibe-mode-design/10`）渲染，带 60 px 屏幕圆角遮罩 |
-| 原型 | `prototype/index.html`：单文件离线原型，横向翻页 + 子页栈 + 打开确认 + 左滑删除 / Undo + 长按删除 + 触感 + 息屏 + IMU 旋转 + Boot 键 + NVS 面板 |
-| 验证 | `build_design.py --strict`：0 layout issues；Playwright smoke：153 passed, 0 failed |
+| 语言 | English / 简体中文，在 Settings → Language 切换；命名统一为 **Idea** |
+| 页面图 | `mockups/`（英文）和 `mockups/zh/`（中文）：各 70 个页面状态，由 `layout.json`（schema `vibe-mode-design/11`）渲染，带 60 px 屏幕圆角遮罩 |
+| 原型 | `prototype/index.html`：单文件离线原型，横向翻页 + 子页栈 + 打开确认 + 左滑删除 / Undo + 长按删除 + 触感 + 息屏 + IMU 旋转 + Boot 键 + 中英文切换 + NVS 面板 |
+| 验证 | `build_design.py --strict`：两种语言 0 layout issues、0 漏翻；Playwright smoke：175 passed, 0 failed |
 
 ![全部页面](mockups/00-overview.png)
 
-## 1. v10 修订：系统行为
+中文版总览：[`mockups/zh/00-overview.png`](mockups/zh/00-overview.png)
+
+## 0. 演示数据与 Idea 图标
+
+示例 Idea 换成了 mosaico-ui 里的 Mosaico App（Pet Talk、Clock、Album、Agenda、Weather……，商店里有 Rolling Maze、Gold Miner），图标**直接使用** `design/mosaico-ui/src/assets/app-icons/<name>.png`（236 px 原图），`generate_assets.py` 只做等比缩小到 56 / 96 / 108 px，输出到 `assets/ideas/`，不重新绘制。来源与授权见 mosaico-ui 的 `ASSET-LICENSES.md`。只有没有图标的开发版（如 Agent 刚装的 hello_world）和末尾的 “+” 仍用本目录生成的占位图。ID、版本、大小和状态（当前、可更新、商店、空间不足）沿用原来的示例。
+
+## 1. v11 修订：系统语言（English / 简体中文）
+
+![中文首页](mockups/zh/home.png) ![语言设置](mockups/zh/language.png)
+
+**入口与行为**
+- Settings 第 5 行 **Language / 语言**，副标题显示当前语言。语言页两个大按钮，每种语言用它自己的文字写（English / 简体中文），不认识当前语言的人也能找到自己的。
+- 点一下立即切换整个界面，提示 “已切换为简体中文” / “Language: English”，不重启。选择存到 `sysmeta/vibe_prefs/lang`；原型存在 localStorage `vibe-lang`，刷新后保持。
+- 不翻译的内容：Idea 名称（按发布时的原名）、Wi‑Fi 名称、网址、共享信息的键和值。Idea 简介和分类由商店按设备语言下发，原型用 `i18n.py` 里的示例译文。
+
+**实现**
+- 英文是源文本。`tools/i18n.py` 是唯一的翻译表，共 283 条，其中 37 条是带 `{占位符}` 的句式；捕获到的值会再查一次表，例如 “Secured · Strong” → “已加密 · 信号强”。
+- `build_design.py` 用同一份布局代码按语言各排一遍：中文状态写入 `layout.json` 的 `locales.zh`，原型模板写入 `prototype.locales.zh`，页面图输出到 `mockups/zh/`。原型切换语言时换用对应模板，运行时拼出的文案在显示前走同一张表（`L()`）。
+- 字体：一行里有汉字，整行就用 Noto Sans CJK SC 排（`sans` → Regular，`medium` → Medium，`dot` → Bold），与拉丁字母的字重、基线一致。子集只含翻译表里出现的约 590 个字符，每个字重约 105 KB（OFL，见 `assets/fonts/OFL-NotoSansSC.txt`）。中文行高 1.15–1.2；折行按字切分，标点不放在行首，手写换行优先。
+- 中文断行不照搬英文：英文靠手动换行凑出两行均衡，中文左对齐时这样会留下一截短行，像话说到一半。规则是放得下就写成一行（确认框的返回说明、帮助步骤、Idea 简介）；放不下时只在逗号或句号处断开，而且第一行要基本排满（≥ 75 %）。居中的短句（首页介绍、结果页说明）可以在逗号处断开，让两行长短均衡。最后一行不能只剩一两个字，“AI 键”这类按键名不能拆到两行。
+- 检查：中文构建时 `--strict` 会把所有残留的英文单词列出来（名称和保留术语除外），并按上面的断行规则检查所有页面、Idea 简介和帮助步骤，目前都是 0。smoke 切到中文后走查 25 个页面，检查残留英文和被截断的中文，再验证刷新后保持、能切回英文。
+
+**术语**
+
+| 英文 | 中文 | 说明 |
+| --- | --- | --- |
+| Idea / Ideas | Idea | 产品概念，保留原文，不译“创意”“应用” |
+| Vibe Mode、AI、Agent、Wi‑Fi、USB、NAND、Boot | 原文 | 品牌、按键丝印和通用技术词 |
+| AI key / power key / Boot key | AI 键 / 电源键 / Boot 键 | 与机身按键对应 |
+| Make Ideas Run | 让 Idea 跑起来 | 口语、有动感；品牌名保留 |
+| Manage / Develop / Settings | 管理 / 开发 / 设置 | 首页三张卡片，副标题“全部 Idea / 动手做一个 / 设备” |
+| Shared info | 共享信息 | 所有 Idea 都能读到的键值 |
+| Hold AI · Press twice | 按住 AI 键 · 连按两下 | 打开确认框里指向按键的提示 |
+| Go（ID 键盘） | 查找 | 这一步是去商店查询，不是“前往” |
+| GO / space（全键盘） | 确定 / 空格 | |
+| Screen off after 3 min | 3 分钟无操作后息屏 | 说清触发条件 |
+| Lock（AI 键反馈） | 息屏 | 首页按 AI 键的实际效果 |
+| Not deleted | 未删除 | 长按中途松手 |
+
+**同时修改的英文文案**
+
+| 位置 | 原来 | 现在 | 原因 |
+| --- | --- | --- | --- |
+| Help 主题底部按钮 | Show QR code | Full guide on your phone | 说清点了以后能得到什么，二维码只是手段 |
+| About 底部按钮 | Mosaico Ideas | Browse Mosaico Ideas | 只有名字，看不出是一个动作 |
+| Settings → Help 副标题 | Guides and QR codes | How-to guides and fixes | 写内容，不写形式 |
+| Getting started 第 2 步 | Or type an Idea ID in Manage to download it. | Or download one: open Manage, tap +, type its ID. | 写出真实操作路径 |
+| Getting started 第 3 步 | Tap an Idea to open it. Hold AI to come back. | … To come back, hold AI and press power twice. | 原文只写了一半，照做回不来 |
+| Download 提示 | Type the 6-digit ID | Enter the 6-digit ID from Mosaico Ideas | 说明 ID 从哪来 |
+| Display → Auto-rotate | Turns with the device (IMU) / Locked in this orientation | Follows how you hold it / Stays in this orientation | 去掉术语，写用户感受 |
+| 当前网络页的安全性 | Open | None | “Open” 和页面上的打开操作容易混淆 |
+| 忘记网络说明 | Ideas lose Wi-Fi until you reconnect. | After forgetting, Ideas stay offline until you reconnect. | 说清是“忘记之后” |
+| 进度页 | Keep the device powered on. | Keep the device on until this finishes. | 说明要保持多久 |
+| 保存结果 | It is on this device now. | Find it on your Ideas pages. | 告诉用户下一步去哪找 |
+
+## 2. v10 修订：系统行为
 
 ### IMU 自动旋转
 
@@ -50,7 +105,7 @@
 
 下载完成、更新完成、存入 NAND 完成、切换 Idea 写入完成、Agent 安装完成时，都给一次“成功”震动：14 ms → 隔 70 ms → 22 ms。下载失败给两下 40 ms。参数见 `tokens.haptics.success` / `error`。
 
-## 2. v9 修订
+## 3. v9 修订
 
 ### 首页与翻页
 
@@ -116,7 +171,7 @@ USB 未连接时和 Wi‑Fi 断开一样，显示**灰色带斜线**的 USB 图�
 
 有底部按钮的页面（Idea info、结果页、Shared 条目、Help 主题、About、进度、当前网络）和 ID 键盘页，toast 自动上移，不遮挡按钮（`tokens.toast.lift`）。
 
-## 3. 480×480 设计系统
+## 4. 480×480 设计系统
 
 | 项目 | 值 |
 | --- | --- |
@@ -133,7 +188,7 @@ USB 未连接时和 Wi‑Fi 断开一样，显示**灰色带斜线**的 USB 图�
 | 方向 | 0 / 90 / 180 / 270°，面板旋转，不重排 |
 | 息屏 | 背光 10 %，Wi‑Fi 断开，1 / 3 / 5 / 10 分钟 / Never |
 
-## 4. 页面与状态（69 个）
+## 5. 页面与状态（每种语言 70 个）
 
 | 区域 | 状态 |
 | --- | --- |
@@ -145,7 +200,7 @@ USB 未连接时和 Wi‑Fi 断开一样，显示**灰色带斜线**的 USB 图�
 | Download | 空、输入中（按住一个键）、满 6 位、查询中、报错、离线 |
 | Progress / Result | download、install、switch、agent；saved / failed / nospace / battery |
 | Develop | ready / waiting / unplugged |
-| Settings / Display / Help / About | 可滚动列表、按下 AI（Back 反馈）、Display（3 分钟 + 自动旋转 / 永不 + 锁定方向）、帮助主题、关于 |
+| Settings / Display / Language / Help / About | 可滚动列表、按下 AI（Back 反馈）、Display（3 分钟 + 自动旋转 / 永不 + 锁定方向）、语言、帮助主题、关于 |
 | Boot 键 | 更新说明（二维码）、更新模式 |
 | Wi‑Fi | 已连、未连、待续任务、连接中、当前网络、密码三态 |
 | Shared | 列表、左滑、空、说明页、条目、新 key、value、改 key |
@@ -154,7 +209,7 @@ USB 未连接时和 Wi‑Fi 断开一样，显示**灰色带斜线**的 USB 图�
 
 机器可读定义见 `layout.json`；命名对象见 `layout-tables.md`。
 
-## 5. 交互表
+## 6. 交互表
 
 | # | 场景 | 行为 |
 | --- | --- | --- |
@@ -176,7 +231,7 @@ USB 未连接时和 Wi‑Fi 断开一样，显示**灰色带斜线**的 USB 图�
 | 16 | 旋转 | IMU 换方向 → 面板旋转；按住屏幕、在键盘页或长按删除时先不转 |
 | 17 | Boot 键 | 按住：更新说明；按住 + 双击电源：更新模式；更新模式里按一次电源：重启 |
 
-## 6. 本地数据与 sysmeta
+## 7. 本地数据与 sysmeta
 
 ```text
 /nand/ideas/<idea_id>/…
@@ -185,11 +240,12 @@ sysmeta/shared/<key>             # 用户自定义；key ≤15（a–z 0–9 _�
 sysmeta/vibe_prefs/pager_hint    # 首页翻页提示已看过
 sysmeta/vibe_prefs/open_confirm  # 打开 Idea 前是否确认
 sysmeta/vibe_prefs/display       # screen_off_s（60/180/300/600/0）、auto_rotate
+sysmeta/vibe_prefs/lang          # en / zh
 ```
 
 删除 Idea / 条目在 Undo 窗口结束后再提交到 NAND / NVS。改 key 是“写新 key、删旧 key”的一次事务。
 
-## 7. 阶段 B handoff
+## 8. 阶段 B handoff
 
 - 保持 `layout.json` 对象名和 `tokens`（`row`、`tints`、`haptics`、`toast.lift`）、`prototype.interactions`（`undo_ms`、`swipe_*`、`page_label_ms`、`danger_hold_ms`）。
 - 根层：状态栏和圆点放在横向 pager 容器之外；二级页用原生 Stack，不挂状态栏。
@@ -200,12 +256,12 @@ sysmeta/vibe_prefs/display       # screen_off_s（60/180/300/600/0）、auto_rot
 - AI 键反馈画在面板坐标（设备固定），不随界面方向。
 - 真机复核：R60 裁切、84 px 触控、QR（6 px 模块）扫描距离、AI GPIO、LRA 手感、帧率。
 
-## 8. 再生成与验证
+## 9. 再生成与验证
 
 ```sh
 cd esp-mosaico-recovery/docs/vibe-mode-0.3-design
 
-.venv/bin/python tools/generate_assets.py          # 或 --skip-fonts
+.venv/bin/python tools/generate_assets.py          # 或 --skip-fonts；--skip-cjk 保留现有中文子集
 .venv/bin/python tools/build_design.py --strict
 .venv/bin/python tools/build_prototype.py
 node tools/prototype_smoke.js [截图目录]
@@ -214,6 +270,6 @@ node tools/prototype_smoke.js [截图目录]
 预期：
 
 ```text
-69 states rendered; 0 layout issues
-153 passed, 0 failed
+70 states × 2 languages rendered; 0 layout issues
+175 passed, 0 failed
 ```

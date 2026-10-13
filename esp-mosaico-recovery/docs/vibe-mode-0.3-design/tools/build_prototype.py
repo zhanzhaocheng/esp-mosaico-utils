@@ -20,7 +20,7 @@ def b64(path: Path) -> str:
 def main() -> None:
     layout = json.loads((DESIGN / "layout.json").read_text(encoding="utf-8"))
     assets = {}
-    for folder in ("assets/icons", "assets/mosaic", "assets/anim", "assets/qr", "assets/ui"):
+    for folder in ("assets/icons", "assets/mosaic", "assets/ideas", "assets/anim", "assets/qr", "assets/ui"):
         for path in sorted((DESIGN / folder).glob("*.png")):
             assets[f"{folder}/{path.name}"] = "data:image/png;base64," + b64(path)
     fonts = DESIGN / "assets/fonts"
@@ -34,6 +34,9 @@ def main() -> None:
         "__FONT_DOT__": b64(fonts / "ArchivoExtended-SemiBold.subset.ttf"),
         "__FONT_SANS__": b64(fonts / "Inter-Regular.subset.ttf"),
         "__FONT_MEDIUM__": b64(fonts / "ArchivoExtended-Medium.subset.ttf"),
+        "__FONT_SC_REGULAR__": b64(fonts / "NotoSansSC-Regular.subset.otf"),
+        "__FONT_SC_MEDIUM__": b64(fonts / "NotoSansSC-Medium.subset.otf"),
+        "__FONT_SC_BOLD__": b64(fonts / "NotoSansSC-Bold.subset.otf"),
         "__LAYOUT__": script_json(layout),
         "__ASSETS__": script_json(assets),
     }

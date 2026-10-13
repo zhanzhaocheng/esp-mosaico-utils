@@ -61,24 +61,24 @@
 | `nav_usb` | image | 380, 24, 20, 20 |  | usb-20-white.png |
 | `nav_battery` | image | 412, 24, 20, 20 |  | battery_mid-20-white.png |
 | `idea_ring_100001` | container | 30, 68, 116, 116 |  |  |
-| `idea_icon_100001` | image | 34, 72, 108, 108 |  | idea_pet-108.png |
-| `idea_name_100001` | label | 16, 188, 144, 42 | medium 18px #F2F2F2 换行 | Pixel Pet |
+| `idea_icon_100001` | image | 34, 72, 108, 108 |  | pet-talk-108.png |
+| `idea_name_100001` | label | 16, 188, 144, 42 | medium 18px #F2F2F2 换行 | Pet Talk |
 | `button_idea_100001` | button | 12, 66, 152, 170 |  | → `idea:100001` |
-| `idea_icon_100002` | image | 186, 72, 108, 108 |  | idea_clock-108.png |
-| `idea_name_100002` | label | 168, 188, 144, 42 | medium 18px #F2F2F2 换行 | Lo-fi Clock |
+| `idea_icon_100002` | image | 186, 72, 108, 108 |  | clock-108.png |
+| `idea_name_100002` | label | 168, 188, 144, 42 | medium 18px #F2F2F2 换行 | Clock |
 | `button_idea_100002` | button | 164, 66, 152, 170 |  | → `idea:100002` |
-| `idea_icon_100003` | image | 338, 72, 108, 108 |  | idea_frame-108.png |
-| `idea_name_100003` | label | 320, 188, 144, 42 | medium 18px #F2F2F2 换行 | Photo Frame |
+| `idea_icon_100003` | image | 338, 72, 108, 108 |  | album-108.png |
+| `idea_name_100003` | label | 320, 188, 144, 42 | medium 18px #F2F2F2 换行 | Album |
 | `button_idea_100003` | button | 316, 66, 152, 170 |  | → `idea:100003` |
-| `idea_icon_100004` | image | 34, 248, 108, 108 |  | idea_timer-108.png |
-| `idea_name_100004` | label | 16, 364, 144, 42 | medium 18px #F2F2F2 换行 | Pomodoro |
+| `idea_icon_100004` | image | 34, 248, 108, 108 |  | stopwatch-108.png |
+| `idea_name_100004` | label | 16, 364, 144, 42 | medium 18px #F2F2F2 换行 | Stopwatch |
 | `button_idea_100004` | button | 12, 242, 152, 170 |  | → `idea:100004` |
-| `idea_icon_100005` | image | 186, 248, 108, 108 |  | idea_face-108.png |
-| `idea_name_100005` | label | 168, 364, 144, 42 | medium 18px #F2F2F2 换行 | Emoji Face |
+| `idea_icon_100005` | image | 186, 248, 108, 108 |  | squircle-studio-108.png |
+| `idea_name_100005` | label | 168, 364, 144, 42 | medium 18px #F2F2F2 换行 | Squircle Studio |
 | `button_idea_100005` | button | 164, 242, 152, 170 |  | → `idea:100005` |
-| `idea_icon_100006` | image | 338, 248, 108, 108 |  | idea_mic-108.png |
+| `idea_icon_100006` | image | 338, 248, 108, 108 |  | agenda-108.png |
 | `idea_badge_100006` | label | 424, 252, 24, 24 | sans 16px #000000 | ↑ |
-| `idea_name_100006` | label | 320, 364, 144, 42 | medium 18px #F2F2F2 换行 | Voice Notes |
+| `idea_name_100006` | label | 320, 364, 144, 42 | medium 18px #F2F2F2 换行 | Agenda |
 | `button_idea_100006` | button | 316, 242, 152, 170 |  | → `idea:100006` |
 | `pager_dot_0` | container | 198, 440, 8, 8 | #262626 |  |
 | `pager_dot_1` | container | 214, 440, 20, 8 | #FF4C01 |  |
@@ -182,7 +182,7 @@
 | `manage_scroll_track` | container | 468, 152, 4, 292 | #262626 |  |
 | `manage_scroll_thumb` | container | 468, 152, 4, 55 | #9A9A9A |  |
 | `toast` | container | 72, 400, 336, 56 | #262626 |  |
-| `toast_text` | label | 96, 417, 200, 22 | sans 18px #F2F2F2 | Deleted Lo-fi Clock |
+| `toast_text` | label | 96, 417, 200, 22 | sans 18px #F2F2F2 | Deleted Clock |
 | `toast_undo` | label | 304, 418, 80, 21 | medium 18px #FF4C01 | Undo |
 | `button_undo` | button | 300, 386, 96, 84 |  | → `toast:undo` |
 
@@ -218,13 +218,13 @@
 | `button_qr_idea_visual` | container | 408, 20, 56, 56 | #1E1E1E |  |
 | `button_qr_idea_icon` | image | 420, 32, 32, 32 |  | qr-32-white.png |
 | `button_qr_idea` | button | 394, 6, 84, 84 |  | → `qr:idea` |
-| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Air Monitor |
-| `info_icon` | image | 24, 96, 96, 96 |  | idea_air-96.png |
+| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Typhoon Monitor |
+| `info_icon` | image | 24, 96, 96, 96 |  | typhoon-monitor-96.png |
 | `info_status_dot` | container | 136, 109, 10, 10 | #9A9A9A |  |
 | `info_status` | label | 154, 102, 302, 26 | medium 22px #F2F2F2 | On this device |
 | `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Sensors · v1.2.2 |
 | `info_meta2` | label | 136, 166, 320, 22 | sans 18px #9A9A9A | 1.3 MB · ID 100012 |
-| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Shows temperature, humidity and air quality from an ⏎ attached sensor. |
+| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Tracks nearby typhoons and storm alerts on a live ⏎ map. |
 | `button_open` | button | 24, 360, 248, 96 | medium 22px #000000 | Open → `idea:open` |
 | `button_delete_track` | container | 296, 360, 160, 96 | #1E1E1E |  |
 | `button_delete_fill` | container | 296, 360, 0, 96 | #E5484D |  |
@@ -242,13 +242,13 @@
 | `button_qr_idea_visual` | container | 408, 20, 56, 56 | #1E1E1E |  |
 | `button_qr_idea_icon` | image | 420, 32, 32, 32 |  | qr-32-white.png |
 | `button_qr_idea` | button | 394, 6, 84, 84 |  | → `qr:idea` |
-| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Voice Notes |
-| `info_icon` | image | 24, 96, 96, 96 |  | idea_mic-96.png |
+| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Agenda |
+| `info_icon` | image | 24, 96, 96, 96 |  | agenda-96.png |
 | `info_status_dot` | container | 136, 109, 10, 10 | #FF4C01 |  |
 | `info_status` | label | 154, 102, 302, 26 | medium 22px #F2F2F2 | Update available |
-| `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Audio · v1.0.0 |
+| `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Display · v1.0.0 |
 | `info_meta2` | label | 136, 166, 320, 22 | sans 18px #9A9A9A | 3.2 MB · ID 100006 |
-| `info_summary` | label | 24, 204, 432, 44 | sans 18px #F2F2F2 换行 | Record short voice memos and play them back any ⏎ time. |
+| `info_summary` | label | 24, 204, 432, 44 | sans 18px #F2F2F2 换行 | Today's events and reminders at a glance, synced ⏎ from your calendar. |
 | `button_update` | button | 16, 256, 448, 80 | #141414 | → `idea:update` |
 | `info_update_title` | label | 100, 270, 312, 26 | medium 22px #F2F2F2 | Update to v1.1.0 |
 | `info_update_sub` | label | 100, 302, 312, 20 | sans 16px #9A9A9A | New version on Mosaico Ideas |
@@ -269,13 +269,13 @@
 | `button_qr_idea_visual` | container | 408, 20, 56, 56 | #1E1E1E |  |
 | `button_qr_idea_icon` | image | 420, 32, 32, 32 |  | qr-32-white.png |
 | `button_qr_idea` | button | 394, 6, 84, 84 |  | → `qr:idea` |
-| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Retro Snake |
-| `info_icon` | image | 24, 96, 96, 96 |  | idea_snake-96.png |
+| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Rolling Maze |
+| `info_icon` | image | 24, 96, 96, 96 |  | rolling-maze-96.png |
 | `info_status_dot` | container | 136, 109, 10, 10 | #9A9A9A |  |
 | `info_status` | label | 154, 102, 302, 26 | medium 22px #F2F2F2 | Not on this device |
-| `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Display · Community · v1.0.3 |
+| `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Motor · Community · v1.0.3 |
 | `info_meta2` | label | 136, 166, 320, 22 | sans 18px #9A9A9A | 0.9 MB · ID 238114 |
-| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | The classic snake game with dot-matrix graphics ⏎ and a high-score table. |
+| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Tilt the device to roll the ball through the maze. ⏎ Uses the IMU. |
 | `button_download` | button | 24, 360, 432, 96 | medium 22px #000000 | Download → `idea:download` |
 
 ## idea-info-nospace — Idea info · not enough space
@@ -290,13 +290,13 @@
 | `button_qr_idea_visual` | container | 408, 20, 56, 56 | #1E1E1E |  |
 | `button_qr_idea_icon` | image | 420, 32, 32, 32 |  | qr-32-white.png |
 | `button_qr_idea` | button | 394, 6, 84, 84 |  | → `qr:idea` |
-| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Dice Roller |
-| `info_icon` | image | 24, 96, 96, 96 |  | idea_dice-96.png |
+| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Gold Miner |
+| `info_icon` | image | 24, 96, 96, 96 |  | gold-miner-96.png |
 | `info_status_dot` | container | 136, 109, 10, 10 | #FF4C01 |  |
 | `info_status` | label | 154, 102, 302, 26 | medium 22px #F2F2F2 | Not enough space |
 | `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Display · Community · v2.1.0 |
 | `info_meta2` | label | 136, 166, 320, 22 | sans 18px #FF4C01 | Needs 0.6 MB · 0.4 MB free |
-| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Roll up to six dice with a shake animation. Great for ⏎ board games. |
+| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Swing the hook, grab the gold and beat the clock. ⏎ Great for quick breaks. |
 | `button_free_space` | button | 24, 360, 432, 96 | medium 22px #000000 | Free up space → `go:manage` |
 
 ## idea-info-current — Idea info · current Idea
@@ -311,13 +311,13 @@
 | `button_qr_idea_visual` | container | 408, 20, 56, 56 | #1E1E1E |  |
 | `button_qr_idea_icon` | image | 420, 32, 32, 32 |  | qr-32-white.png |
 | `button_qr_idea` | button | 394, 6, 84, 84 |  | → `qr:idea` |
-| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Pixel Pet |
-| `info_icon` | image | 24, 96, 96, 96 |  | idea_pet-96.png |
+| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Pet Talk |
+| `info_icon` | image | 24, 96, 96, 96 |  | pet-talk-96.png |
 | `info_status_dot` | container | 136, 109, 10, 10 | #FF4C01 |  |
 | `info_status` | label | 154, 102, 302, 26 | medium 22px #F2F2F2 | Current Idea |
-| `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Display · v1.2.0 |
+| `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Chat · v1.2.0 |
 | `info_meta2` | label | 136, 166, 320, 22 | sans 18px #9A9A9A | 1.8 MB · ID 100001 |
-| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | A tiny dot-matrix pet that lives on your screen. Feed ⏎ it, play with it and watch it grow. |
+| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Chat with a pocket pet that remembers you, reacts ⏎ to touch and grows over time. |
 | `button_open` | button | 24, 360, 248, 96 | medium 22px #000000 | Open → `idea:open` |
 | `button_delete` | button | 296, 360, 160, 96 | medium 22px #5C5C5C | Delete → `idea:delete` |
 
@@ -333,13 +333,13 @@
 | `button_qr_idea_visual` | container | 408, 20, 56, 56 | #1E1E1E |  |
 | `button_qr_idea_icon` | image | 420, 32, 32, 32 |  | qr-32-white.png |
 | `button_qr_idea` | button | 394, 6, 84, 84 |  | → `qr:idea` |
-| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Air Monitor |
-| `info_icon` | image | 24, 96, 96, 96 |  | idea_air-96.png |
+| `info_title` | label | 88, 32, 308, 33 | medium 28px #F2F2F2 | Typhoon Monitor |
+| `info_icon` | image | 24, 96, 96, 96 |  | typhoon-monitor-96.png |
 | `info_status_dot` | container | 136, 109, 10, 10 | #9A9A9A |  |
 | `info_status` | label | 154, 102, 302, 26 | medium 22px #F2F2F2 | On this device |
 | `info_meta` | label | 136, 140, 320, 22 | sans 18px #9A9A9A | Sensors · v1.2.2 |
 | `info_meta2` | label | 136, 166, 320, 22 | sans 18px #9A9A9A | 1.3 MB · ID 100012 |
-| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Shows temperature, humidity and air quality from an ⏎ attached sensor. |
+| `info_summary` | label | 24, 204, 432, 65 | sans 18px #F2F2F2 换行 | Tracks nearby typhoons and storm alerts on a live ⏎ map. |
 | `button_open` | button | 24, 360, 96, 96 | #F2F2F2 | → `idea:open` |
 | `button_delete_track` | container | 144, 360, 312, 96 | #1E1E1E |  |
 | `button_delete_fill` | container | 144, 360, 187, 96 | #E5484D |  |
@@ -347,7 +347,7 @@
 | `delete_dim` | container | 0, 0, 480, 344 | #000000 |  |
 | `delete_popup` | container | 40, 232, 400, 104 | #262626 |  |
 | `delete_popup_icon` | image | 64, 252, 32, 32 |  | trash-32-red.png |
-| `delete_popup_title` | label | 112, 250, 312, 26 | medium 22px #F2F2F2 | Delete Air Monitor? |
+| `delete_popup_title` | label | 112, 250, 312, 26 | medium 22px #F2F2F2 | Delete Typhoon Monitor? |
 | `delete_popup_body` | label | 112, 284, 312, 20 | sans 16px #9A9A9A | Keep holding for 3 s. Let go to cancel. |
 
 ## download — Download · empty
@@ -375,7 +375,7 @@
 | `id_slot_4` | label | 302, 92, 44, 56 | dot 28px #F2F2F2 |   |
 | `id_slot_5_box` | container | 354, 92, 44, 56 | #141414 |  |
 | `id_slot_5` | label | 354, 92, 44, 56 | dot 28px #F2F2F2 |   |
-| `id_status` | label | 24, 156, 432, 20 | sans 16px #9A9A9A | Type the 6-digit ID |
+| `id_status` | label | 24, 156, 432, 20 | sans 16px #9A9A9A | Enter the 6-digit ID from Mosaico Ideas |
 | `key_1_visual` | label | 92, 188, 88, 56 | dot 28px #F2F2F2 | 1 |
 | `key_1` | button | 84, 180, 104, 72 |  | → `key:1` |
 | `key_2_visual` | label | 196, 188, 88, 56 | dot 28px #F2F2F2 | 2 |
@@ -427,7 +427,7 @@
 | `id_slot_4` | label | 302, 92, 44, 56 | dot 28px #F2F2F2 |   |
 | `id_slot_5_box` | container | 354, 92, 44, 56 | #141414 |  |
 | `id_slot_5` | label | 354, 92, 44, 56 | dot 28px #F2F2F2 |   |
-| `id_status` | label | 24, 156, 432, 20 | sans 16px #9A9A9A | Type the 6-digit ID |
+| `id_status` | label | 24, 156, 432, 20 | sans 16px #9A9A9A | Enter the 6-digit ID from Mosaico Ideas |
 | `key_1_visual` | label | 86, 182, 100, 68 | dot 28px #F2F2F2 | 1 |
 | `key_1` | button | 84, 180, 104, 72 |  | → `key:1` |
 | `key_2_visual` | label | 196, 188, 88, 56 | dot 28px #F2F2F2 | 2 |
@@ -479,7 +479,7 @@
 | `id_slot_4` | label | 302, 92, 44, 56 | dot 28px #F2F2F2 | 1 |
 | `id_slot_5_box` | container | 354, 92, 44, 56 | #141414 |  |
 | `id_slot_5` | label | 354, 92, 44, 56 | dot 28px #F2F2F2 | 4 |
-| `id_status` | label | 24, 156, 432, 20 | sans 16px #9A9A9A | Type the 6-digit ID |
+| `id_status` | label | 24, 156, 432, 20 | sans 16px #9A9A9A | Enter the 6-digit ID from Mosaico Ideas |
 | `key_1_visual` | label | 92, 188, 88, 56 | dot 28px #F2F2F2 | 1 |
 | `key_1` | button | 84, 180, 104, 72 |  | → `key:1` |
 | `key_2_visual` | label | 196, 188, 88, 56 | dot 28px #F2F2F2 | 2 |
@@ -634,9 +634,9 @@
 
 | 名称 | 类型 | x, y, w, h | 样式 | 内容 / 动作 |
 |---|---|---|---|---|
-| `progress_icon` | image | 32, 48, 96, 96 |  | idea_snake-96.png |
+| `progress_icon` | image | 32, 48, 96, 96 |  | rolling-maze-96.png |
 | `progress_title` | label | 144, 56, 312, 26 | medium 22px #F2F2F2 | Downloading |
-| `progress_detail` | label | 144, 90, 312, 22 | sans 18px #9A9A9A | Retro Snake · v1.0.3 |
+| `progress_detail` | label | 144, 90, 312, 22 | sans 18px #9A9A9A | Rolling Maze · v1.0.3 |
 | `progress_phase` | label | 144, 118, 312, 20 | sans 16px #9A9A9A | Step 1 of 2 · Download |
 | `progress_percent` | label | 24, 168, 432, 102 | dot 88px #F2F2F2 | 62% |
 | `progress` | progress | 40, 280, 400, 12 | #262626 |  |
@@ -649,9 +649,9 @@
 
 | 名称 | 类型 | x, y, w, h | 样式 | 内容 / 动作 |
 |---|---|---|---|---|
-| `progress_icon` | image | 32, 48, 96, 96 |  | idea_snake-96.png |
+| `progress_icon` | image | 32, 48, 96, 96 |  | rolling-maze-96.png |
 | `progress_title` | label | 144, 56, 312, 26 | medium 22px #F2F2F2 | Installing |
-| `progress_detail` | label | 144, 90, 312, 22 | sans 18px #9A9A9A | Retro Snake · v1.0.3 |
+| `progress_detail` | label | 144, 90, 312, 22 | sans 18px #9A9A9A | Rolling Maze · v1.0.3 |
 | `progress_phase` | label | 144, 118, 312, 20 | sans 16px #9A9A9A | Step 2 of 2 · Install |
 | `progress_percent` | label | 24, 168, 432, 102 | dot 88px #F2F2F2 | 81% |
 | `progress` | progress | 40, 280, 400, 12 | #262626 |  |
@@ -663,9 +663,9 @@
 
 | 名称 | 类型 | x, y, w, h | 样式 | 内容 / 动作 |
 |---|---|---|---|---|
-| `progress_icon` | image | 32, 48, 96, 96 |  | idea_weather-96.png |
+| `progress_icon` | image | 32, 48, 96, 96 |  | weather-96.png |
 | `progress_title` | label | 144, 56, 312, 26 | medium 22px #F2F2F2 | Switching Ideas |
-| `progress_detail` | label | 144, 90, 312, 22 | sans 18px #9A9A9A | Weather Station · v2.0.1 |
+| `progress_detail` | label | 144, 90, 312, 22 | sans 18px #9A9A9A | Weather · v2.0.1 |
 | `progress_phase` | label | 144, 118, 312, 20 | sans 16px #9A9A9A | Step 1 of 2 · Prepare |
 | `progress_percent` | label | 24, 168, 432, 102 | dot 88px #F2F2F2 | 24% |
 | `progress` | progress | 40, 280, 400, 12 | #262626 |  |
@@ -694,8 +694,8 @@
 |---|---|---|---|---|
 | `result_hero` | image | 180, 48, 120, 120 |  | hero_saved-120.png |
 | `result_title` | label | 24, 184, 432, 33 | medium 28px #F2F2F2 | Idea saved |
-| `result_caption` | label | 24, 226, 432, 22 | sans 18px #9A9A9A | Retro Snake · v1.0.3 |
-| `result_detail` | label | 24, 254, 432, 44 | sans 18px #9A9A9A | It is on this device now. |
+| `result_caption` | label | 24, 226, 432, 22 | sans 18px #9A9A9A | Rolling Maze · v1.0.3 |
+| `result_detail` | label | 24, 254, 432, 44 | sans 18px #9A9A9A | Find it on your Ideas pages. |
 | `button_result_left` | button | 24, 380, 208, 84 | medium 22px #F2F2F2 | Done → `result:done` |
 | `button_result_right` | button | 248, 380, 208, 84 | medium 22px #000000 | Open → `result:open` |
 
@@ -707,7 +707,7 @@
 |---|---|---|---|---|
 | `result_hero` | image | 180, 48, 120, 120 |  | hero_cross-120.png |
 | `result_title` | label | 24, 184, 432, 33 | medium 28px #F2F2F2 | Couldn't download |
-| `result_caption` | label | 24, 226, 432, 22 | sans 18px #9A9A9A | Retro Snake · v1.0.3 |
+| `result_caption` | label | 24, 226, 432, 22 | sans 18px #9A9A9A | Rolling Maze · v1.0.3 |
 | `result_detail` | label | 24, 254, 432, 44 | sans 18px #9A9A9A | The connection dropped. ⏎ Check Wi-Fi and try again. |
 | `button_result_left` | button | 24, 380, 208, 84 | medium 22px #F2F2F2 | Done → `result:done` |
 | `button_result_right` | button | 248, 380, 208, 84 | medium 22px #000000 | Try again → `result:retry` |
@@ -720,7 +720,7 @@
 |---|---|---|---|---|
 | `result_hero` | image | 180, 48, 120, 120 |  | hero_full-120.png |
 | `result_title` | label | 24, 184, 432, 33 | medium 28px #F2F2F2 | Not enough storage |
-| `result_caption` | label | 24, 226, 432, 22 | sans 18px #9A9A9A | Retro Snake needs 0.9 MB |
+| `result_caption` | label | 24, 226, 432, 22 | sans 18px #9A9A9A | Rolling Maze needs 0.9 MB |
 | `result_detail` | label | 24, 254, 432, 44 | sans 18px #9A9A9A | Delete an Idea you don't use ⏎ to make room. |
 | `button_result_left` | button | 24, 380, 208, 84 | medium 22px #F2F2F2 | Cancel → `result:done` |
 | `button_result_right` | button | 248, 380, 208, 84 | medium 22px #000000 | Manage → `go:manage` |
@@ -743,8 +743,8 @@
 
 | 名称 | 类型 | x, y, w, h | 样式 | 内容 / 动作 |
 |---|---|---|---|---|
-| `launch_icon` | image | 186, 80, 108, 108 |  | idea_weather-108.png |
-| `launch_title` | label | 24, 212, 432, 33 | medium 28px #F2F2F2 | Opening Weather Station |
+| `launch_icon` | image | 186, 80, 108, 108 |  | weather-108.png |
+| `launch_title` | label | 24, 212, 432, 33 | medium 28px #F2F2F2 | Opening Weather |
 | `launch_spinner` | image | 208, 316, 64, 64 |  | spin64-00.png |
 
 ## running — Your Idea is running
@@ -753,8 +753,8 @@
 
 | 名称 | 类型 | x, y, w, h | 样式 | 内容 / 动作 |
 |---|---|---|---|---|
-| `running_icon` | image | 186, 76, 108, 108 |  | idea_weather-108.png |
-| `running_title` | label | 24, 208, 432, 33 | medium 28px #F2F2F2 | Weather Station |
+| `running_icon` | image | 186, 76, 108, 108 |  | weather-108.png |
+| `running_title` | label | 24, 208, 432, 33 | medium 28px #F2F2F2 | Weather |
 
 ## boot — Boot
 
@@ -834,7 +834,7 @@
 | `settings` | list | 16, 96, 448, 368 | 行距 88 | 行模板 `settings_row` |
 | `settings_fade` | image | 16, 440, 448, 24 |  | list-fade.png |
 | `settings_scroll_track` | container | 468, 100, 4, 344 | #262626 |  |
-| `settings_scroll_thumb` | container | 468, 100, 4, 293 | #9A9A9A |  |
+| `settings_scroll_thumb` | container | 468, 100, 4, 243 | #9A9A9A |  |
 
 ## display — Display · screen off and auto-rotate
 
@@ -853,10 +853,24 @@
 | `button_timeout_600` | button | 24, 220, 136, 84 | medium 22px #F2F2F2 | 10 min → `display:timeout:600` |
 | `button_timeout_0` | button | 172, 220, 136, 84 | medium 22px #F2F2F2 | Never → `display:timeout:0` |
 | `button_rotate` | button | 16, 320, 448, 80 | #141414 | → `display:rotate` |
-| `display_rotate_sub` | label | 100, 366, 312, 20 | sans 16px #9A9A9A | Turns with the device (IMU) |
+| `display_rotate_sub` | label | 100, 366, 312, 20 | sans 16px #9A9A9A | Follows how you hold it |
 | `rotate_switch_track` | container | 396, 344, 52, 32 | #FF4C01 |  |
 | `rotate_switch_knob` | container | 419, 347, 26, 26 | #FFFFFF |  |
 | `display_note` | label | 24, 416, 432, 20 | sans 16px #9A9A9A | Wi-Fi turns off while the screen is off. |
+
+## language — Language
+
+![language](mockups/language.png)
+
+| 名称 | 类型 | x, y, w, h | 样式 | 内容 / 动作 |
+|---|---|---|---|---|
+| `button_back_language_visual` | container | 16, 20, 56, 56 | #1E1E1E |  |
+| `button_back_language_icon` | image | 28, 32, 32, 32 |  | back-32-white.png |
+| `button_back_language` | button | 2, 6, 84, 84 |  | → `back` |
+| `language_title` | label | 88, 32, 368, 33 | medium 28px #F2F2F2 | Language |
+| `button_lang_en` | button | 24, 104, 208, 84 | medium 22px #000000 | English → `lang:en` |
+| `button_lang_zh` | button | 248, 104, 208, 84 | medium 22px #F2F2F2 | 简体中文 → `lang:zh` |
+| `language_note` | label | 24, 212, 432, 39 | sans 16px #9A9A9A | The whole interface switches right away. ⏎ Idea names stay as published. |
 
 ## wifi — Wi-Fi · connected
 
@@ -1145,9 +1159,9 @@
 | `button_back_help_topic` | button | 2, 6, 84, 84 |  | → `back` |
 | `help_topic_title` | label | 88, 32, 368, 33 | medium 28px #F2F2F2 | Getting started |
 | `help_step_1` | label | 64, 108, 392, 44 | sans 18px #F2F2F2 换行 | Plug in USB and ask your agent to build an ⏎ Idea. |
-| `help_step_2` | label | 64, 180, 392, 44 | sans 18px #F2F2F2 换行 | Or type an Idea ID in Manage to download it. |
-| `help_step_3` | label | 64, 252, 392, 44 | sans 18px #F2F2F2 换行 | Tap an Idea to open it. Hold AI to come back. |
-| `button_help_qr` | button | 24, 380, 432, 84 | medium 22px #F2F2F2 | Show QR code → `qr:help-start` |
+| `help_step_2` | label | 64, 180, 392, 44 | sans 18px #F2F2F2 换行 | Or download one: open Manage, tap +, type ⏎ its ID. |
+| `help_step_3` | label | 64, 252, 392, 44 | sans 18px #F2F2F2 换行 | Tap an Idea to open it. To come back, hold AI ⏎ and press power twice. |
+| `button_help_qr` | button | 24, 380, 432, 84 | medium 22px #F2F2F2 | Full guide on your phone → `qr:help-start` |
 
 ## about — About
 
@@ -1163,7 +1177,7 @@
 | `about_version` | label | 196, 117, 248, 22 | sans 18px #F2F2F2 | v1.2 |
 | `about_mac` | label | 196, 181, 248, 22 | sans 18px #F2F2F2 | 30:ED:A0:F4:60:56 |
 | `about_storage` | label | 196, 245, 248, 22 | sans 18px #F2F2F2 | 32.8 of 64 MB |
-| `button_about_qr` | button | 24, 380, 432, 84 | medium 22px #F2F2F2 | Mosaico Ideas → `qr:ideas` |
+| `button_about_qr` | button | 24, 380, 432, 84 | medium 22px #F2F2F2 | Browse Mosaico Ideas → `qr:ideas` |
 
 ## qr-develop — QR code · vibe-coding guide
 
@@ -1190,7 +1204,7 @@
 | `button_back_qr_visual` | container | 16, 20, 56, 56 | #1E1E1E |  |
 | `button_back_qr_icon` | image | 28, 32, 32, 32 |  | back-32-white.png |
 | `button_back_qr` | button | 2, 6, 84, 84 |  | → `back` |
-| `qr_title` | label | 88, 32, 368, 33 | medium 28px #F2F2F2 | Pixel Pet |
+| `qr_title` | label | 88, 32, 368, 33 | medium 28px #F2F2F2 | Pet Talk |
 | `qr_card` | container | 24, 112, 216, 216 | #FFFFFF |  |
 | `qr_code` | image | 33, 121, 198, 198 | QR，每模块 6 px | idea-100001.png |
 | `qr_desc` | label | 260, 116, 196, 87 | sans 18px #F2F2F2 换行 | This Idea's page: ⏎ details, updates and a ⏎ link to share it. |

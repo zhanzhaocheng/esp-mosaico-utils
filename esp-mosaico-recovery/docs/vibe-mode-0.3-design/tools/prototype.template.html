@@ -7,6 +7,9 @@
 @font-face { font-family: "VibeDot"; src: url(data:font/ttf;base64,__FONT_DOT__) format("truetype"); font-weight: 600; }
 @font-face { font-family: "VibeSans"; src: url(data:font/ttf;base64,__FONT_SANS__) format("truetype"); font-weight: 400; }
 @font-face { font-family: "VibeSans"; src: url(data:font/ttf;base64,__FONT_MEDIUM__) format("truetype"); font-weight: 500; }
+@font-face { font-family: "VibeSC"; src: url(data:font/otf;base64,__FONT_SC_REGULAR__) format("opentype"); font-weight: 400; }
+@font-face { font-family: "VibeSC"; src: url(data:font/otf;base64,__FONT_SC_MEDIUM__) format("opentype"); font-weight: 500; }
+@font-face { font-family: "VibeSC"; src: url(data:font/otf;base64,__FONT_SC_BOLD__) format("opentype"); font-weight: 700; }
 
 /* The device on the left, a quiet control column on the right, all screens
    below. The page stays dark so the cream device reads like the product photo. */
@@ -55,7 +58,7 @@ header.intro p { margin: 0; color: var(--muted); max-width: 68ch; }
 .key-fb .bar { position: absolute; left: 340px; top: 4px; width: 64px; height: 8px; border-radius: 4px; background: var(--accent);
   transform: scaleX(.4); opacity: 0; transition: transform 80ms ease-out, opacity 80ms ease-out; }
 .key-fb .chip { position: absolute; left: 372px; top: 20px; height: 32px; padding: 0 14px; border-radius: 16px; background: #1e1e1e;
-  color: #f2f2f2; font: 500 16px/32px var(--body); transform: translateX(-50%) scale(.9); opacity: 0; white-space: nowrap;
+  color: #f2f2f2; font: 500 16px/32px "VibeSans", "VibeSC", var(--body); transform: translateX(-50%) scale(.9); opacity: 0; white-space: nowrap;
   transition: transform 120ms ease-out, opacity 120ms ease-out; }
 .key-fb.down .bar { transform: none; opacity: 1; }
 .key-fb.show .chip { transform: translateX(-50%) var(--chip-rot, rotate(0deg)); opacity: 1; }
@@ -93,7 +96,7 @@ button.o[data-hold]:active, button.o[data-pager]:active { transform: none; }
 .list::-webkit-scrollbar { display: none; }
 .row-hit { position: absolute; border: 0; padding: 0; background: transparent; cursor: pointer; border-radius: 18px; -webkit-tap-highlight-color: transparent; }
 .row-hit:active { transform: scale(.985); }
-.kb-key { position: absolute; border: 0; padding: 0; cursor: pointer; font-family: var(--body); color: #f2f2f2; display: flex; align-items: center; justify-content: center; }
+.kb-key { position: absolute; border: 0; padding: 0; cursor: pointer; font-family: "VibeSans", "VibeSC", var(--body); color: #f2f2f2; display: flex; align-items: center; justify-content: center; }
 .kb-key:active { filter: brightness(1.35); }
 .kb-dim .kb-key { opacity: .45; pointer-events: none; }
 /* Invisible hit areas light up their visual ("<name>_visual") instead of themselves. */
@@ -286,11 +289,41 @@ const P = LAYOUT.prototype;
 const I = P.interactions;
 const FAMILY = { dot: "VibeDot", sans: "VibeSans", medium: "VibeSans" };
 const WEIGHT = { dot: 600, sans: 400, medium: 500 };
-const STATES = {};
-for (const s of LAYOUT.states.concat(P.states || [])) STATES[s.id] = s;
-const ROWS = { manage: P.row_templates.manage_row, networks: P.row_templates.network_row, shared: P.row_templates.shared_row,
-               settings: P.row_templates.settings_row };
-const SWIPE_TPL = P.row_templates.swipe_action;
+/* UI language. Each language has its own laid-out states and templates (Chinese text has
+   other widths); dynamic strings go through L() when they are drawn. */
+let LANG = localStorage.getItem("vibe-lang") === "zh" ? "zh" : "en";
+const STATES_BY = { en: {}, zh: {} };
+for (const s of LAYOUT.states.concat(P.states || [])) STATES_BY.en[s.id] = s;
+for (const s of LAYOUT.locales.zh.states.concat(P.locales.zh.states || [])) STATES_BY.zh[s.id] = s;
+const RT = () => LANG === "zh" ? P.locales.zh.row_templates : P.row_templates;
+const ROW_TPL = { manage: "manage_row", networks: "network_row", shared: "shared_row", settings: "settings_row" };
+const ZH = P.i18n.zh, CAT_ZH = P.i18n.category_zh;
+const PLACEHOLDER = /\{(\w+)\}/g;
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const ZH_PATTERNS = Object.entries(ZH).filter(([k]) => /\{\w+\}/.test(k)).map(([k, zh]) => {
+  const names = [];
+  let src = "^", pos = 0;
+  for (const m of k.matchAll(PLACEHOLDER)) { src += escapeRe(k.slice(pos, m.index)) + "(.+?)"; names.push(m[1]); pos = m.index + m[0].length; }
+  return { re: new RegExp(src + escapeRe(k.slice(pos)) + "$", "s"), names, zh, lit: k.replace(PLACEHOLDER, "").length };
+}).sort((a, b) => b.lit - a.lit);
+/* English UI text → current language (same table and rules as tools/i18n.py). */
+function L(text) {
+  if (LANG !== "zh" || !text || !String(text).trim()) return text;
+  if (ZH[text] !== undefined) return ZH[text];
+  for (const p of ZH_PATTERNS) {
+    const m = p.re.exec(text);
+    if (m) return p.zh.replace(PLACEHOLDER, (_, n) => { const v = m[p.names.indexOf(n) + 1]; return ZH[v] !== undefined ? ZH[v] : v; });
+  }
+  return text;
+}
+const hasCJK = (t) => /[\u3000-\u9fff\uff00-\uffef]/.test(t || "");
+const CJK_WEIGHT = { dot: 700, sans: 400, medium: 500 };
+/* A label with Chinese in it is set entirely in the CJK face, like the mockups. */
+function setSpan(span, text, font = "sans") {
+  span.textContent = text;
+  span.style.fontFamily = hasCJK(text) ? "VibeSC" : FAMILY[font];
+  span.style.fontWeight = hasCJK(text) ? CJK_WEIGHT[font] : WEIGHT[font];
+}
 const ROW_CARD_H = T.row.height;
 const ROW_H = P.row_heights;
 const CAT_LABEL = Object.fromEntries(P.categories.map((c) => [c.id, c.label]));
@@ -305,8 +338,9 @@ const asset = (path) => {
   return "";
 };
 const iconPath = (name, size, color) => `assets/icons/${name}-${size}-${color}.png`;
-const catLabel = (id) => CAT_LABEL[id] || "Other";
-const ideaIcon = (a, size) => `assets/mosaic/idea_${a.glyph || "plus"}-${size}.png`;
+const catLabel = (id) => { const c = CAT_LABEL[id] || "Other"; return LANG === "zh" ? (CAT_ZH[c] || c) : c; };
+// Ideas use their Mosaico launcher icon; builds without one get the generated "+" placeholder.
+const ideaIcon = (a, size) => a.icon ? `assets/ideas/${a.icon}-${size}.png` : `assets/mosaic/idea_${a.glyph || "plus"}-${size}.png`;
 const sizeMB = (a) => parseFloat(a.size) || 0;
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
@@ -425,16 +459,14 @@ function hex(c, a) {
 }
 function textNode(o, text, align, offset) {
   const s = document.createElement("span");
-  s.textContent = text;
-  s.style.fontFamily = FAMILY[o.font];
-  s.style.fontWeight = WEIGHT[o.font];
+  setSpan(s, L(text), o.font);
   s.style.fontSize = px(o.size);
   s.style.lineHeight = px(LH[o.font] * o.size);
   s.style.color = o.color;
   s.style.textAlign = align;
   if (offset) s.style.transform = `translateX(${offset}px)`;
   if (o.wrap) {
-    s.style.whiteSpace = "normal"; s.style.display = "-webkit-box"; s.style.webkitBoxOrient = "vertical";
+    s.style.whiteSpace = "pre-line"; s.style.display = "-webkit-box"; s.style.webkitBoxOrient = "vertical";
     s.style.webkitLineClamp = String(Math.max(1, Math.floor(o.h / (LH[o.font] * o.size)))); s.style.overflow = "hidden";
     s.style.width = "100%";
   } else if (o.overflow === "ellipsis") {
@@ -469,11 +501,11 @@ function holdHandlers(n, o, onAction, span) {
       const t = partner.querySelector(".o-text"); if (t) t.style.opacity = "0";
       const img = partner.querySelector("img"); if (img) { img._left = img.style.left; img.style.left = px((ex.partner_rect[2] - 32) / 2); }
     }
-    overlay = buildLayer(clone(P.row_templates.delete_popup), null, null);
+    overlay = buildLayer(clone(RT().delete_popup), null, null);
     overlay.classList.add("hold-overlay");
     const a = cur().params && (ideaById(cur().params.id) || STORE[cur().params.id]);
     const title = overlay.querySelector('[data-name="delete_popup_title"] span');
-    if (a && title) title.textContent = `Delete ${a.name}?`;
+    if (a && title) setSpan(title, L(`Delete ${a.name}?`), "medium");
     root.appendChild(overlay);
   };
   const collapse = () => {
@@ -488,14 +520,14 @@ function holdHandlers(n, o, onAction, span) {
   };
   const count = () => {
     if (!span) return;
-    span.textContent = ex ? `Keep holding · ${Math.max(1, Math.ceil((ms - (performance.now() - t0)) / 1000))} s` : "Keep holding…";
+    setSpan(span, L(ex ? `Keep holding · ${Math.max(1, Math.ceil((ms - (performance.now() - t0)) / 1000))} s` : "Keep holding…"), o.font);
   };
   const reset = () => {
     clearTimeout(timer); clearInterval(tick);
     if (done || !held) return;
     held = false;
     fill.style.transition = "width 160ms ease-out"; fill.style.width = "0";
-    if (span) { span.textContent = o.text; span.style.color = o.color; }
+    if (span) { setSpan(span, L(o.text), o.font); span.style.color = o.color; }
     collapse();
     if (performance.now() - t0 > 350) setNav(what === "delete" ? "Not deleted" : "Not forgotten");
   };
@@ -640,9 +672,9 @@ function renderKeyboard(n, kb, onAction) {
   key(8, y3, 56, "shift", kbMode === "upper" ? "#3a3a3a" : kb.function_color, "kb:shift", { icon: iconPath("back", 28, "white"), rotate: 90, aria: "Shift" });
   key(416, y3, 56, "delete", kb.function_color, "kb:del", { icon: iconPath("backspace", 28, "white"), aria: "Delete" });
   key(16, y4, 80, kbMode === "sym" ? "ABC" : "123", kb.function_color, "kb:sym", { size: kb.function_font_size });
-  key(104, y4, 272, "space", kb.key_color, "kb: ", { size: kb.function_font_size });
+  key(104, y4, 272, L("space"), kb.key_color, "kb: ", { size: kb.function_font_size });
   // GO is orange only once the input is valid; until then it looks like a function key.
-  key(384, y4, 80, "GO", kb.go_enabled ? kb.ok_color : kb.ok_disabled_color, "kb:go",
+  key(384, y4, 80, L("GO"), kb.go_enabled ? kb.ok_color : kb.ok_disabled_color, "kb:go",
       { size: kb.function_font_size, color: kb.go_enabled ? kb.ok_text_color : kb.ok_disabled_text_color });
   const go = n.querySelector('[data-key="kb:go"]');
   if (go) go.dataset.ready = kb.go_enabled ? "1" : "0";
@@ -677,7 +709,7 @@ function renderList(root, vp, kind, items, onAction) {
     Object.assign(row.style, { top: px(i * ROW_H[kind]), height: px(ROW_CARD_H) });
     const front = document.createElement("div");
     front.className = "swipe-front";
-    for (const o of fillRow(ROWS[kind], values)) front.appendChild(renderObj(o, null));
+    for (const o of fillRow(RT()[ROW_TPL[kind]], values)) front.appendChild(renderObj(o, null));
     if (onAction) {
       const hit = document.createElement("button");
       hit.type = "button"; hit.className = "row-hit";
@@ -698,7 +730,7 @@ function renderList(root, vp, kind, items, onAction) {
       else {
         const back = document.createElement("div");
         back.className = "swipe-back";
-        for (const o of clone(SWIPE_TPL)) {
+        for (const o of clone(RT().swipe_action)) {
           if (o.action) o.action = `swipe:${kind}:${i}`;
           back.appendChild(renderObj(o, onAction));
         }
@@ -821,7 +853,7 @@ function setImage(objs, name, image) {
   if (o && o.type === "image") o.image = image;
   else if (o && o.icon) o.icon.image = image;
 }
-const tpl = (id) => clone(STATES[id].objects);
+const tpl = (id) => clone(STATES_BY[LANG][id].objects);
 
 /* Page dots (and invisible, larger hit areas) for the root pager. */
 function pagerObjs(active) {
@@ -844,7 +876,7 @@ const withoutDots = (objs) => objs.filter((o) => !(o.name && o.name.startsWith("
 function homeView() {
   const objs = withoutDots(tpl(model.wifi.connected ? "home" : "home-offline"));
   setText(objs, "nav_badge", " ");
-  if (!hintDone) objs.push(clone(named(STATES["home-first"].objects, "pager_hint")));
+  if (!hintDone) objs.push(clone(named(STATES_BY[LANG]["home-first"].objects, "pager_hint")));
   return { objs: objs.concat(pagerObjs(0)) };
 }
 
@@ -925,8 +957,9 @@ const measure = document.createElement("canvas").getContext("2d");
 function fitTitle(objs, name, text) {
   const o = setText(objs, name, text);
   if (!o || o.size !== 28) return;
-  measure.font = `${WEIGHT.medium} 28px ${FAMILY.medium}`;
-  if (measure.measureText(text).width <= o.w) return;
+  const shown = L(text);
+  measure.font = hasCJK(shown) ? `${CJK_WEIGHT.medium} 28px VibeSC` : `${WEIGHT.medium} 28px ${FAMILY.medium}`;
+  if (measure.measureText(shown).width <= o.w) return;
   const h28 = o.h;
   o.size = 22; o.h = Math.ceil(LH.medium * 22); o.y += Math.floor((h28 - o.h) / 2);
 }
@@ -937,7 +970,7 @@ function infoMode(id) {
   if (local) return id === model.current ? "current" : updateIds().includes(id) ? "update" : "local";
   return sizeMB(STORE[id]) > freeMB() ? "nospace" : "remote";
 }
-const metaOf = (a) => `${catLabel(a.category)}${a.official ? "" : " · Community"} · v${a.version}`;
+const metaOf = (a) => `${catLabel(a.category)}${a.official ? "" : ` · ${L("Community")}`} · v${a.version}`;
 function infoView(p) {
   const id = p.id, local = ideaById(id), mode = infoMode(id), store = STORE[id], a = local || store;
   const objs = tpl(`idea-info-${mode}`);
@@ -960,7 +993,7 @@ function downloadView() {
     const box = named(objs, `id_slot_${i}_box`), hot = !!error || (i === digits.length && !looking);
     box.border = hot ? C.accent : null; box.border_width = hot ? 2 : 0;
   }
-  setText(objs, "id_status", error || (looking ? "Looking up…" : "Type the 6-digit ID"), error ? C.accent : undefined);
+  setText(objs, "id_status", error || (looking ? "Looking up…" : "Enter the 6-digit ID from Mosaico Ideas"), error ? C.accent : undefined);
   const go = named(objs, "key_go_visual"), ready = keypadReady();
   if (go) { go.bg = ready ? C.accent : C.raised; go.color = ready ? "#FFFFFF" : C.text_disabled; }
   return { objs };
@@ -1004,13 +1037,13 @@ function renderModal(animate) {
     return;
   }
   const a = ideaById(model.confirm.id), dev = model.devIdea;
-  let objs = clone(P.row_templates.confirm);
+  let objs = clone(RT().confirm);
   setImage(objs, "confirm_icon", ideaIcon(a, 56));
   setText(objs, "confirm_title", `Open ${a.name}?`);
   if (dev && !model.devSaved && model.current === dev.id && a.id !== dev.id) setText(objs, "confirm_sub", `Unsaved ${dev.name} will be replaced.`, C.accent);
   if (model.confirm.skip) {
     const i = objs.findIndex((o) => o.name === "confirm_skip_box");
-    objs.splice(i, 1, ...clone(P.row_templates.confirm_check).filter((o) => o.name !== "confirm_skip_label"));
+    objs.splice(i, 1, ...clone(RT().confirm_check).filter((o) => o.name !== "confirm_skip_label"));
   }
   placeKeyMarkers(objs);
   const layer = buildLayer(objs, null, onAction);
@@ -1032,6 +1065,7 @@ function settingsView() {
     else if (r.go === "wifi") sub = model.wifi.ssid;
     if (r.go === "display") sub = screenOffText();
     if (r.go === "shared") sub = nvs.length ? entries(nvs.length) : "Empty";
+    if (r.go === "language") sub = P.i18n.langs[LANG];
     return { settings_icon: iconPath(icon, 32, tone), settings_title: r.title, settings_sub: sub,
              "settings_sub:name": r.sub_name, button: r.button };
   });
@@ -1046,7 +1080,7 @@ function displayView() {
   const track = named(objs, "rotate_switch_track"), knob = named(objs, "rotate_switch_knob");
   if (track) track.bg = model.autoRotate ? C.accent : C.outline;
   if (knob) knob.x = track.x + (model.autoRotate ? 23 : 3);
-  setText(objs, "display_rotate_sub", model.autoRotate ? "Turns with the device (IMU)" : "Locked in this orientation");
+  setText(objs, "display_rotate_sub", model.autoRotate ? "Follows how you hold it" : "Stays in this orientation");
   return { objs };
 }
 
@@ -1090,7 +1124,7 @@ function wifiNetworkView() {
   const net = NETS.find((n) => n.ssid === model.wifi.ssid) || NETS[0];
   fitTitle(objs, "wifi_network_title", model.wifi.ssid);
   setText(objs, "network_signal", net.signal);
-  setText(objs, "network_security", net.secured ? "WPA2" : "Open");
+  setText(objs, "network_security", net.secured ? "WPA2" : "None");
   setText(objs, "network_ip", model.wifi.ip);
   return { objs };
 }
@@ -1157,21 +1191,7 @@ function sharedEntryView(p) {
 }
 
 /* ---- Help, About, QR ---- */
-const HELP_TOPICS = {
-  start: { title: "Getting started", qr: "help-start", steps: null },
-  develop: { title: "Develop Ideas", qr: "develop", steps: [
-    "Open the Vibe-coding guide and\nfollow it in your AI agent.",
-    "Plug in USB. The agent installs the\nIdea over the cable.",
-    "Check Develop for USB and agent status." ] },
-  ids: { title: "Idea IDs & sharing", qr: "help-ids", steps: [
-    "Every Idea has a 6-digit ID shown\non Mosaico Ideas.",
-    "Open Manage, tap +, type the ID\nand press Go.",
-    "Share your own Idea to get an ID\nfor friends." ] },
-  fix: { title: "Troubleshooting", qr: "help-fix", steps: [
-    "No Wi-Fi? Open Settings and\nconnect first.",
-    "Not enough space? Delete an Idea\nin Manage.",
-    "Stuck inside an Idea? Hold AI and\npress power twice." ] },
-};
+const HELP_TOPICS = Object.fromEntries(P.help_topics.map((t) => [t.key, t]));
 function helpTopicView(p) {
   const t = HELP_TOPICS[p.topic] || HELP_TOPICS.start;
   const objs = tpl("help-topic");
@@ -1227,7 +1247,7 @@ function tickProgress() {
   if (!pageLayer || cur().view !== "progress") return;
   for (const [name, text] of Object.entries(progressTexts(model.progress))) {
     const span = pageLayer.querySelector(`[data-name="${name}"] span`);
-    if (span) span.textContent = text;
+    if (span) setSpan(span, L(text), "sans");
   }
   const fill = pageLayer.querySelector('[data-name="progress"] [data-fill]');
   if (fill) fill.style.width = `${model.progress.pct}%`;
@@ -1253,7 +1273,7 @@ function resultView() {
   if (r.kind === "saved" || r.kind === "updated") {
     setText(objs, "result_title", r.kind === "updated" ? "Idea updated" : "Idea saved");
     setText(objs, "result_caption", r.caption);
-    setText(objs, "result_detail", r.kind === "updated" ? "The new version is ready." : "It is on this device now.");
+    setText(objs, "result_detail", r.kind === "updated" ? "The new version is ready." : "Find it on your Ideas pages.");
   } else if (r.kind === "failed") {
     setText(objs, "result_caption", r.caption);
   } else if (r.kind === "nospace") {
@@ -1284,6 +1304,7 @@ const VIEWS = {
   shared_help: () => ({ objs: tpl("shared-help") }), display: displayView,
   boot_tip: () => ({ objs: tpl("boot-tip") }), update_mode: () => ({ objs: tpl("update-mode") }),
   help: () => ({ objs: tpl("help") }), help_topic: helpTopicView, about: aboutView, qr: qrView,
+  language: () => ({ objs: tpl("language") }),
   launching: launchingView, running: runningView, boot: () => ({ objs: tpl("boot") }),
 };
 const NO_NAV_BACK = ["launching", "running", "boot", "update_mode"];
@@ -1332,7 +1353,7 @@ function setNav(text, ms = I.nav_flash_ms) {
   if (!isRootView()) return showToast(text);
   clearTimeout(navTimer);
   navOverride = text;
-  for (const el of navSpans()) { const s = el.querySelector("span"); if (s) s.textContent = text; }
+  for (const el of navSpans()) { const s = el.querySelector("span"); if (s) setSpan(s, L(text), "medium"); }
   navTimer = setTimeout(clearNav, ms);
 }
 let toastTimer = 0, undoFn = null;
@@ -1340,7 +1361,7 @@ function showToast(text, undo = null) {
   if (staticMode) return;
   clearTimeout(toastTimer);
   screen.querySelector(".toast-layer")?.remove();
-  const objs = clone(undo ? P.row_templates.toast_undo : P.row_templates.toast);
+  const objs = clone(undo ? RT().toast_undo : RT().toast);
   setText(objs, "toast_text", text);
   // Never cover a page's bottom action row (or the ID keypad): lift the toast above it.
   const lift = T.toast.lift[cur().view];
@@ -1365,7 +1386,7 @@ function hideToast() {
 function clearNav() {
   clearTimeout(navTimer);
   navOverride = null;
-  for (const el of navSpans()) { const s = el.querySelector("span"); if (s) s.textContent = el.dataset.base || " "; }
+  for (const el of navSpans()) { const s = el.querySelector("span"); if (s) setSpan(s, L(el.dataset.base || " "), "medium"); }
 }
 function navIcons(objs) {
   setImage(objs, "nav_wifi", model.wifi.connected ? iconPath("wifi", 20, "white") : iconPath("wifi_off", 20, "grey"));
@@ -1422,6 +1443,7 @@ function makeLayer(entry) {
 /* render(dir, axis): dir 1 = forward (new page enters from the right), -1 = back, 0 = in place. */
 function render(dir = 0, axis = "X", opts = {}) {
   if (staticMode) return;
+  if (gst && gst.moved) abortGesture();
   if (dir) hideToast();   // moving to another page ends the toast (and its Undo)
   fixRoot();
   const entry = cur();
@@ -1475,6 +1497,7 @@ function setPage(page) {
   stack[0] = rootEntry(page);
   const layer = pageLayer;
   if (!layer || !layer._content) return render(dir, "X", { dist: 480 });
+  pruneRootContent();
   const old = layer._content, objs = rootObjs(stack[0]), nb = makeContent(objs);
   layer.insertBefore(nb, layer._chrome);
   layer._content = nb; layer._entry = stack[0];
@@ -1732,6 +1755,14 @@ function deleteEntry(key, leave) {
   showToast(`Deleted ${key}`, () => { nvs.splice(Math.min(idx, nvs.length), 0, e); saveNvs(); render(0); });
 }
 
+function setLang(lang) {
+  if (!P.i18n.langs[lang] || lang === LANG) return;
+  LANG = lang;
+  localStorage.setItem("vibe-lang", lang);
+  buildGallery();
+  render(0);
+  setNav(`Language: ${P.i18n.langs[lang]}`);
+}
 /* ---------------- Actions ---------------- */
 function onAction(action) {
   const sep = action.indexOf(":");
@@ -1740,6 +1771,7 @@ function onAction(action) {
   if (kind === "kb") return keyboardInput(rest);
   const [arg, extra] = rest.split(":");
   if (kind === "page") return setPage(Number(arg));
+  if (kind === "lang") return setLang(arg);
   if (kind === "go") {
     if (arg === "download") model.dl = { digits: "", looking: false, error: "" };
     if (arg === "add_idea") {
@@ -1892,7 +1924,7 @@ function keyFeedbackDown() {
   keyFb.classList.add("down");
 }
 function keyFeedbackUp(label) {
-  if (label) { keyFb.querySelector(".chip").textContent = label; keyFb.classList.add("show"); }
+  if (label) { keyFb.querySelector(".chip").textContent = L(label); keyFb.classList.add("show"); }
   fbTimer = setTimeout(() => {
     keyFb.classList.add("out");
     fbTimer = setTimeout(() => keyFb.classList.remove("down", "show", "out"), T.key_feedback.fade_ms + 10);
@@ -2060,8 +2092,26 @@ function toScreen(e) {
   return { x: x * Math.cos(a) - y * Math.sin(a) + 240, y: x * Math.sin(a) + y * Math.cos(a) + 240, k };
 }
 const isRoot = () => stack.length === 1 && ROOT_VIEWS.includes(cur().view);
+/* Drop a gesture that never got its release (or is interrupted by a re-render): remove the
+   half-shown neighbour page and put everything back in place. */
+function abortGesture() {
+  if (!gst) return;
+  const g = gst;
+  gst = null;
+  if (g.nb) g.nb.remove();
+  for (const el of [pageLayer, pageLayer && pageLayer._content]) {
+    if (el) { el.style.transition = ""; el.style.transform = ""; }
+  }
+  if (g.row) { const f = g.row.querySelector(".swipe-front"); if (f) { f.classList.remove("dragging"); f.style.transform = g.row.classList.contains("open") ? `translateX(${-T.swipe.shift}px)` : ""; } }
+}
+// Root pages: only the live content (plus a neighbour while dragging) may exist.
+function pruneRootContent(keep) {
+  if (!pageLayer) return;
+  for (const c of pageLayer.querySelectorAll(":scope > .pager-content")) if (c !== pageLayer._content && c !== keep) c.remove();
+}
 screen.addEventListener("pointerdown", (e) => {
   activity();
+  if (gst) abortGesture();
   if (staticMode || e.button > 0 || model.sleeping) return;
   const p = toScreen(e);
   const list = e.target.closest && e.target.closest(".list");
@@ -2082,6 +2132,7 @@ function rootDrag(dx) {
   }
   if (!gst.nb || gst.dir !== dir) {
     if (gst.nb) gst.nb.remove();
+    pruneRootContent();
     gst.nbObjs = rootObjs(rootEntry(target));
     gst.nb = makeContent(gst.nbObjs);
     gst.nb.style.pointerEvents = "none";
@@ -2094,7 +2145,11 @@ function rootDrag(dx) {
 screen.addEventListener("pointermove", (e) => {
   if (!gst || gst.id !== e.pointerId) return;
   const p = toScreen(e), dx = p.x - gst.x0, dy = p.y - gst.y0;
-  if (!gst.axis && Math.hypot(dx, dy) > 8) gst.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+  if (!gst.axis && Math.hypot(dx, dy) > 8) {
+    gst.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    // From here on the release must come back to the screen, even if it happens outside it.
+    try { screen.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
+  }
   if (!gst.axis) return;
   gst.moved = true;
   if (gst.axis === "x" && gst.edge && pageLayer) {
@@ -2159,6 +2214,10 @@ function endGesture(e, cancelled) {
 }
 screen.addEventListener("pointerup", (e) => { endGesture(e, false); applyRotation(); }, true);
 screen.addEventListener("pointercancel", (e) => { endGesture(e, true); applyRotation(); }, true);
+// Fallback: a release anywhere on the page still ends the gesture.
+window.addEventListener("pointerup", (e) => { if (gst && gst.id === e.pointerId) { endGesture(e, false); applyRotation(); } });
+window.addEventListener("pointercancel", (e) => { if (gst && gst.id === e.pointerId) abortGesture(); });
+window.addEventListener("blur", () => abortGesture());
 
 /* Computer keyboard: ↑ is the AI key; Esc is Back; digits and letters reach the keypad and keyboard pages. */
 document.addEventListener("keydown", (e) => {
@@ -2200,7 +2259,7 @@ const CHECKS = [
   ["更新", "Manage → 标题右侧带数字的 <b>↑</b> 更新按钮。<em>预期：按钮转圈、数字递减；需要更新的行排在前面；完成后底部提示 Updated，按钮消失。</em>"],
   ["左滑删除与撤销", "Manage 里把一行向左滑，点 <b>Delete</b>。<em>预期：底部出现 Deleted … Undo，4 秒内可恢复；当前 Idea 回弹并提示不能删。</em>"],
   ["详情里长按删除", "Manage 点一行进入详情，按住 <b>Delete</b>。<em>预期：Open 缩成图标，Delete 变宽并出现红色进度，上方弹出提示并倒数 3 秒；中途松手提示 Not deleted；按满 3 秒删除并返回 Manage。</em>"],
-  ["输入 ID", "Manage 右上角 + → 输入 <b>238114</b>。<em>预期：按下的键会变大并有触感；输满 6 位前 Go 是灰的，满 6 位变橙色；Go → Retro Snake 详情 → 下载 → Idea saved。</em>"],
+  ["输入 ID", "Manage 右上角 + → 输入 <b>238114</b>。<em>预期：按下的键会变大并有触感；输满 6 位前 Go 是灰的，满 6 位变橙色；Go → Rolling Maze 详情 → 下载 → Idea saved。</em>"],
   ["密码键盘", "Settings → Wi‑Fi → Maker Lab，输入密码。<em>预期：少于 8 位时 GO 是灰的，点了会提示；满 8 位 GO 变橙色；wrongpass 会报错并清空。</em>"],
   ["共享信息", "Settings → Shared info：? 看说明；+ 先 key 后 value；条目页分别改 Key / Value。<em>预期：没输入时 GO 是灰的；保存后底部提示 Saved；右侧 NVS 面板实时更新。</em>"],
   ["USB 状态", "点“USB 数据线已插入”拔掉 USB。<em>预期：状态栏 USB 图标变灰并带斜线，和 Wi‑Fi 断开一致。</em>"],
@@ -2343,20 +2402,25 @@ function showStatic(state) {
 function exitStatic() { staticMode = false; staticBar.classList.remove("show"); screen.replaceChildren(); render(0); }
 document.getElementById("staticExit").addEventListener("click", exitStatic);
 const thumbs = document.getElementById("thumbs");
-for (const state of LAYOUT.states) {
-  const b = document.createElement("button");
-  b.type = "button"; b.className = "thumb";
-  const mini = document.createElement("div"); mini.className = "mini";
-  const inner = document.createElement("div"); inner.className = "screen-static";
-  inner.appendChild(buildLayer(state.objects, null, null));
-  mini.appendChild(inner);
-  const cap = document.createElement("span"); cap.textContent = state.title;
-  b.append(mini, cap);
-  b.addEventListener("click", () => showStatic(state));
-  thumbs.appendChild(b);
+function buildGallery() {
+  thumbs.replaceChildren();
+  const states = LANG === "zh" ? LAYOUT.locales.zh.states : LAYOUT.states;
+  for (const state of states) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "thumb";
+    const mini = document.createElement("div"); mini.className = "mini";
+    const inner = document.createElement("div"); inner.className = "screen-static";
+    inner.appendChild(buildLayer(state.objects, null, null));
+    mini.appendChild(inner);
+    const cap = document.createElement("span"); cap.textContent = state.title;
+    b.append(mini, cap);
+    b.addEventListener("click", () => showStatic(state));
+    thumbs.appendChild(b);
+  }
+  document.getElementById("galleryNote").textContent =
+    `设计文档中的 ${states.length} 个页面状态（当前显示${LANG === "zh" ? "中文" : "英文"}界面，可在设备的 设置 → 语言 切换）。点开可在设备中查看静态页面，再点“返回可交互原型”继续操作。`;
 }
-document.getElementById("galleryNote").textContent =
-  `设计文档中的 ${LAYOUT.states.length} 个页面状态。点开可在设备中查看静态页面，再点“返回可交互原型”继续操作。`;
+buildGallery();
 
 /* ---------------- Fit the device to narrow screens ---------------- */
 const fit = document.getElementById("deviceFit"), scaleBox = document.getElementById("deviceScale");

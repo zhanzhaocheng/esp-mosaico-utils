@@ -20,14 +20,28 @@ from __future__ import annotations
 import itertools
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 
+from i18n import CATEGORY_ZH, LANGS, ZH, has_cjk, translate
 from sample_data import (CATEGORIES, CATEGORY_LABEL, CURRENT, GLYPHS, NAND_CAPACITY_MB, PRESETS,
                          PRODUCT, SHARED_SAMPLE, STORE_ONLY, STORE_UPDATES, VERSION)
+
+LANG = "en"  # the build runs once per UI language; set_lang() switches
+
+
+def set_lang(lang: str) -> None:
+    global LANG
+    LANG = lang
+
+
+def loc(text: str) -> str:
+    """English UI text in the current build language (see tools/i18n.py)."""
+    return translate(text, LANG)
 
 DESIGN = Path(__file__).resolve().parents[1]
 W = H = 480
@@ -83,6 +97,18 @@ FONTS = {
     "sans": "assets/fonts/Inter-Regular.subset.ttf",
     "medium": "assets/fonts/ArchivoExtended-Medium.subset.ttf",
 }
+# Chinese text uses Noto Sans SC in the same three roles (display → Bold). A label whose
+# text contains Chinese is drawn entirely in the CJK face; Latin-only labels keep the
+# Latin faces, so digits and Idea names look the same in both languages.
+FONTS_CJK = {
+    "dot": "assets/fonts/NotoSansSC-Bold.subset.otf",
+    "sans": "assets/fonts/NotoSansSC-Regular.subset.otf",
+    "medium": "assets/fonts/NotoSansSC-Medium.subset.otf",
+}
+
+
+def font_file(font: str, text: str = "") -> str:
+    return FONTS_CJK[font] if has_cjk(text) else FONTS[font]
 # Line height per em, from the subset fonts' vertical metrics.
 LINE_EM = {"dot": 1.15, "sans": 1.2, "medium": 1.15}
 PX_MM = 38.8 / 480
@@ -113,6 +139,7 @@ TOKENS = {
                "accent": ACCENT, "danger": DANGER, "cream": CREAM, "primary_bg": PRIMARY_BG,
                "primary_fg": PRIMARY_FG},
     "fonts": FONTS,
+    "fonts_cjk": FONTS_CJK,
     "line_height_em": LINE_EM,
     "type_scale": TYPE_SCALE,
     "radius": {"card": 20, "row": 18, "key": 20, "sheet": 32, "pill": "h/2"},
@@ -181,7 +208,9 @@ def container(x, y, w, h, bg=None, radius=0, border=None, bw=0, name=None, opaci
 def label(x, y, w, text, font="sans", size=16, color=TEXT, align="left", h=None, name=None,
           bg=None, radius=0, wrap=False, ellipsis=False):
     """Single-line labels that show Idea names, SSIDs or store text pass
-    ``ellipsis=True`` (GSP ``overflow: "ellipsis"``) so they never clip mid-glyph."""
+    ``ellipsis=True`` (GSP ``overflow: "ellipsis"``) so they never clip mid-glyph.
+    Text is given in English and stored in the build language."""
+    text = loc(text)
     lines = text.count("\n") + 1
     obj = {"type": "label", "x": x, "y": y, "w": w, "h": h or line_h(font, size, lines),
            "text": text, "font": font, "size": size, "color": color, "align": align,
@@ -194,6 +223,7 @@ def label(x, y, w, text, font="sans", size=16, color=TEXT, align="left", h=None,
 
 def button(x, y, w, h, text="", font="medium", size=22, color=TEXT, bg=RAISED, radius=None,
            border=None, bw=0, icon=None, action=None, name=None, icon_gap=10):
+    text = loc(text)
     obj = {"type": "button", "x": x, "y": y, "w": w, "h": h, "text": text, "font": font,
            "size": size, "color": color, "bg": bg, "radius": h // 2 if radius is None else radius,
            "border": border, "border_width": bw, "action": action, "name": name, "icon": None}
@@ -233,7 +263,7 @@ def keyboard(y=224, name="keyboard", go=False):
     """Native keyboard. GO is orange only when the input is valid (``go``); otherwise it
     is drawn like a function key with dim text, and pressing it explains what's missing."""
     return {"type": "keyboard", "x": 0, "y": y, "w": W, "h": 233, "name": name, "go_enabled": go,
-            **TOKENS["keyboard"]}
+            "space_label": loc("space"), "go_label": loc("GO"), **TOKENS["keyboard"]}
 
 
 # --------------------------------------------------------------------------
@@ -243,21 +273,24 @@ _FONT_CACHE: dict[tuple[str, int], ImageFont.FreeTypeFont] = {}
 _CMAP: dict[str, set[int]] = {}
 
 
-def font_for(font: str, size: int) -> ImageFont.FreeTypeFont:
-    key = (font, size)
+def font_for(font: str, size: int, text: str = "") -> ImageFont.FreeTypeFont:
+    path = font_file(font, text)
+    key = (path, size)
     if key not in _FONT_CACHE:
-        _FONT_CACHE[key] = ImageFont.truetype(str(DESIGN / FONTS[font]), size)
+        _FONT_CACHE[key] = ImageFont.truetype(str(DESIGN / path), size)
     return _FONT_CACHE[key]
 
 
 def missing_glyphs(text: str, font: str) -> list[str]:
-    if font not in _CMAP:
-        _CMAP[font] = set(TTFont(DESIGN / FONTS[font]).getBestCmap())
-    return sorted({ch for ch in text if ch != "\n" and ord(ch) not in _CMAP[font]})
+    path = font_file(font, text)
+    if path not in _CMAP:
+        _CMAP[path] = set(TTFont(DESIGN / path).getBestCmap())
+    return sorted({ch for ch in text if ch != "\n" and ord(ch) not in _CMAP[path]})
 
 
 def text_width(text: str, font: str, size: int) -> float:
-    f = font_for(font, size)
+    text = loc(text)
+    f = font_for(font, size, text)
     return max((f.getlength(line) for line in text.split("\n")), default=0)
 
 
@@ -269,19 +302,30 @@ def ellipsize(text: str, f, width: float) -> str:
     return text.rstrip() + "…"
 
 
+# Chinese breaks between any two characters, Latin between words; closing punctuation
+# never starts a line.
+_TOKENS = re.compile(r"[\u3000-\u9fff\uff00-\uffef]|[^\s\u3000-\u9fff\uff00-\uffef]+|\s+")
+_NO_LINE_START = set("，。、：；？！）」』…·")
+
+
 def wrap_lines(text: str, font: str, size: int, width: float, max_lines: int) -> tuple[list[str], bool]:
-    """Greedy word wrap; returns (lines, truncated)."""
-    f = font_for(font, size)
-    lines, line = [], ""
-    for word in text.split():
-        trial = f"{line} {word}".strip()
-        if f.getlength(trial) <= width or not line:
-            line = trial
-        else:
-            lines.append(line)
-            line = word
-    if line:
-        lines.append(line)
+    """Greedy wrap; returns (lines, truncated)."""
+    text = loc(text)
+    f = font_for(font, size, text)
+    lines = []
+    for para in text.split("\n"):  # a hand-placed line break always wins
+        line = ""
+        for tok in _TOKENS.findall(para):
+            if tok.isspace():
+                line += " " if line else ""
+                continue
+            trial = line + tok
+            if f.getlength(trial.rstrip()) <= width or not line.strip() or tok in _NO_LINE_START:
+                line = trial
+            else:
+                lines.append(line.rstrip())
+                line = tok
+        lines.append(line.rstrip())
     if len(lines) <= max_lines:
         return lines, False
     kept = lines[:max_lines]
@@ -334,7 +378,9 @@ def mb(idea) -> float:
 
 def row_detail(idea) -> str:
     text = CATEGORY_LABEL.get(idea["category"], "Other")
-    return text if idea["official"] else f"{text} · Community"
+    if LANG == "zh":
+        text = CATEGORY_ZH.get(text, text)
+    return text if idea["official"] else f"{text} · {loc('Community')}"
 
 
 def used_mb(ideas=PRESETS) -> float:
@@ -342,6 +388,8 @@ def used_mb(ideas=PRESETS) -> float:
 
 
 def idea_icon(x, y, idea, size=108, name=None):
+    if idea.get("icon"):  # a Mosaico launcher icon (copied from mosaico-ui, resized only)
+        return image(x, y, f"assets/ideas/{idea['icon']}-{size}.png", name=name, w=size, h=size)
     return image(x, y, f"assets/mosaic/idea_{idea['glyph']}-{size}.png", name=name, w=size, h=size)
 
 
@@ -726,6 +774,9 @@ def key_marker(key, text, fg, bg, tone):
                          name=f"confirm_key_{key}_chip", bg=bg, radius=16)]
 
 
+CONFIRM_BACK = "To come back to Vibe Mode, hold AI and\npress power twice."
+
+
 def confirm_open(idea, checked=False, warn=None):
     """Asked before an Idea takes over the screen. Full screen, no nested boxes: what happens,
     how to come back, and arrows at the screen edges pointing at the two keys involved
@@ -733,12 +784,13 @@ def confirm_open(idea, checked=False, warn=None):
     ``warn`` replaces the subtitle when the running build is not saved yet."""
     objs = [container(0, 0, W, H, BG, 0, name="confirm_scrim", role="scrim")]
     dialog = key_marker("ai", "Hold AI", PRIMARY_FG, ACCENT, "orange")
+    back_lines = len(loc(CONFIRM_BACK).split("\n"))
     dialog += [idea_icon(24, 92, idea, LEAD, "confirm_icon"),
                label(96, 94, 360, f"Open {idea['name']}?", "medium", 22, TEXT, name="confirm_title", ellipsis=True),
                label(96, 126, 360, warn or "Vibe Mode closes while it runs.", "sans", 16, ACCENT if warn else TEXT2,
                      name="confirm_sub", ellipsis=True),
-               label(24, 172, 432, "To come back to Vibe Mode, hold AI and\npress power twice.", "sans", 18, TEXT,
-                     h=line_h("sans", 18, 2), name="confirm_back"),
+               label(24, 172 + (2 - back_lines) * line_h("sans", 18) // 2, 432, CONFIRM_BACK, "sans", 18, TEXT,
+                     h=line_h("sans", 18, back_lines), name="confirm_back"),
                secondary(24, 232, 208, "Cancel", "confirm:cancel", "button_confirm_cancel"),
                primary(248, 232, 208, "Open", "confirm:open", "button_confirm_open", "play"),
                container(48, 350, 28, 28, ACCENT if checked else None, 8, border=None if checked else TEXT2,
@@ -964,7 +1016,7 @@ def download(digits="", looking=False, error="", offline=False, pressed=None):
                            name=f"id_slot_{i}_box"),
                  label(x, SLOT_Y, SLOT_W, digits[i] if i < len(digits) else " ", "dot", 28, TEXT, "center",
                        h=SLOT_H, name=f"id_slot_{i}")]
-    status = error or ("Looking up…" if looking else "Type the 6-digit ID")
+    status = error or ("Looking up…" if looking else "Enter the 6-digit ID from Mosaico Ideas")
     objs.append(label(24, 156, 432, status, "sans", 16, ACCENT if error else TEXT2, "center",
                       name="id_status", ellipsis=True))
     for r, row in enumerate(KEYPAD):
@@ -1050,18 +1102,18 @@ def progress_page(kind="download"):
     if cancel:
         objs.append(secondary(24, ACTION_Y, 432, "Cancel", "progress:cancel", "button_cancel"))
     else:
-        objs.append(label(24, 404, 432, "Keep the device powered on.", "sans", 16, TEXT2, "center"))
+        objs.append(label(24, 404, 432, "Keep the device on until this finishes.", "sans", 16, TEXT2, "center"))
     return objs
 
 
 RESULTS = {
     # kind: pictogram, title, caption, detail, left button, right button
-    "saved": ("saved", "Idea saved", "Retro Snake · v1.0.3", "It is on this device now.",
+    "saved": ("saved", "Idea saved", "Rolling Maze · v1.0.3", "Find it on your Ideas pages.",
               ("Done", "result:done"), ("Open", "result:open")),
-    "failed": ("cross", "Couldn't download", "Retro Snake · v1.0.3",
+    "failed": ("cross", "Couldn't download", "Rolling Maze · v1.0.3",
                "The connection dropped.\nCheck Wi-Fi and try again.",
                ("Done", "result:done"), ("Try again", "result:retry")),
-    "nospace": ("full", "Not enough storage", "Retro Snake needs 0.9 MB",
+    "nospace": ("full", "Not enough storage", "Rolling Maze needs 0.9 MB",
                 "Delete an Idea you don't use\nto make room.",
                 ("Cancel", "result:done"), ("Manage", "go:manage")),
     "battery": ("battery", "Battery low", "Charge to 20% to switch Ideas",
@@ -1112,7 +1164,8 @@ SETTINGS_ROWS = [  # icon, title, sub, target view, button name, sub-label name
     ("wifi", "Wi-Fi", "Studio-5G", "wifi", "button_wifi", "settings_wifi"),
     ("display", "Display", "Screen off after 3 min", "display", "button_display", "settings_display"),
     ("key", "Shared info", f"{len(SHARED_SAMPLE)} entries", "shared", "button_shared", "settings_shared"),
-    ("help", "Help", "Guides and QR codes", "help", "button_help", "settings_help"),
+    ("help", "Help", "How-to guides and fixes", "help", "button_help", "settings_help"),
+    ("globe", "Language", "English", "language", "button_language", "settings_language"),
     ("chip", "About", PRODUCT, "about", "button_about", "settings_about"),
 ]
 SETTINGS_Y = SUB_CONTENT_Y
@@ -1132,6 +1185,8 @@ def settings(offline=False):
     for i, row in enumerate(SETTINGS_ROWS[:5]):
         if offline and i == 0:
             row = ("wifi_off",) + row[1:2] + ("Not connected",) + row[3:]
+        if row[3] == "language":
+            row = row[:2] + (LANGS[LANG],) + row[3:]
         objs += settings_row(SETTINGS_Y + i * ROW_PITCH, row, vp)
     objs.append(list_fade(LIST_BOTTOM - 24, "settings_fade"))
     objs += scrollbar("settings", SETTINGS_Y, SETTINGS_H, len(SETTINGS_ROWS))
@@ -1144,6 +1199,19 @@ def switch(x, y, on, name):
             container(x + (23 if on else 3), y + 3, 26, 26, WHITE, 13, name=f"{name}_knob")]
 
 
+def language_page():
+    """Two chips, each language named in its own script so anyone can find theirs."""
+    objs = header("Language", "language")
+    for i, (code, name) in enumerate(LANGS.items()):
+        on = code == LANG
+        objs.append(button(24 + i * 224, SUB_CONTENT_Y + 8, 208, 84, name, "medium", 22,
+                           PRIMARY_FG if on else TEXT, PRIMARY_BG if on else RAISED, radius=24,
+                           action=f"lang:{code}", name=f"button_lang_{code}"))
+    objs.append(label(24, 212, 432, "The whole interface switches right away.\nIdea names stay as published.",
+                      "sans", 16, TEXT2, "center", h=line_h("sans", 16, 2), name="language_note"))
+    return objs
+
+
 def display_page(timeout=180, rotate=True):
     """Screen-off timeout as five chips (one tap, no sub-page) and Auto-rotate as a switch."""
     objs = header("Display", "display")
@@ -1153,7 +1221,7 @@ def display_page(timeout=180, rotate=True):
         on = secs == timeout
         objs.append(button(x, y, 136, 84, text, "medium", 22, PRIMARY_FG if on else TEXT, PRIMARY_BG if on else RAISED,
                            radius=24, action=f"display:timeout:{secs}", name=f"button_timeout_{secs}"))
-    objs += list_row(320, "Auto-rotate", "Turns with the device (IMU)", ("tile", "rotate", "neutral"),
+    objs += list_row(320, "Auto-rotate", "Follows how you hold it", ("tile", "rotate", "neutral"),
                      "display:rotate", "button_rotate", trail=None, sub_name="display_rotate_sub")
     objs += switch(396, 344, rotate, "rotate_switch")
     objs.append(label(24, 416, 432, "Wi-Fi turns off while the screen is off.", "sans", 16, TEXT2, "center",
@@ -1232,9 +1300,22 @@ HELP_TOPICS = [
 ]
 HELP_STEPS = [
     "Plug in USB and ask your agent to build an Idea.",
-    "Or type an Idea ID in Manage to download it.",
-    "Tap an Idea to open it. Hold AI to come back.",
+    "Or download one: open Manage, tap +, type its ID.",
+    "Tap an Idea to open it. To come back, hold AI and press power twice.",
 ]
+HELP_TOPIC_STEPS = {
+    "start": HELP_STEPS,
+    "develop": ["Open the Vibe-coding guide and\nfollow it in your AI agent.",
+                "Plug in USB. The agent installs the\nIdea over the cable.",
+                "Check Develop for USB and agent status."],
+    "ids": ["Every Idea has a 6-digit ID shown\non Mosaico Ideas.",
+            "Open Manage, tap +, type the ID\nand press Go.",
+            "Share your own Idea to get an ID\nfor friends."],
+    "fix": ["No Wi-Fi? Open Settings and\nconnect first.",
+            "Not enough space? Delete an Idea\nin Manage.",
+            "Stuck inside an Idea? Hold AI and\npress power twice."],
+}
+HELP_STEP_W = 392
 
 
 def help_page():
@@ -1249,11 +1330,11 @@ def help_topic():
     objs = header("Getting started", "help_topic", size=title_size("Idea IDs & sharing"))
     for i, text in enumerate(HELP_STEPS):
         y = 108 + i * 72
-        lines, _ = wrap_lines(text, "sans", 18, 392, 2)
+        lines, _ = wrap_lines(text, "sans", 18, HELP_STEP_W, 2)
         objs += [label(24, y, 24, str(i + 1), "dot", 22, ACCENT),
-                 label(64, y, 392, "\n".join(lines), "sans", 18, TEXT, h=line_h("sans", 18, 2), wrap=True,
+                 label(64, y, HELP_STEP_W, "\n".join(lines), "sans", 18, TEXT, h=line_h("sans", 18, 2), wrap=True,
                        name=f"help_step_{i + 1}")]
-    objs.append(secondary(24, ACTION_Y, 432, "Show QR code", "qr:help-start", "button_help_qr", "qr"))
+    objs.append(secondary(24, ACTION_Y, 432, "Full guide on your phone", "qr:help-start", "button_help_qr", "qr"))
     return objs
 
 
@@ -1264,7 +1345,7 @@ def about():
                                       ("MAC", MAC_ADDRESS, "about_mac"),
                                       ("Storage", f"{used:.1f} of {NAND_CAPACITY_MB:.0f} MB", "about_storage")],
                       "about_card")
-    objs.append(secondary(24, ACTION_Y, 432, "Mosaico Ideas", "qr:ideas", "button_about_qr", "qr"))
+    objs.append(secondary(24, ACTION_Y, 432, "Browse Mosaico Ideas", "qr:ideas", "button_about_qr", "qr"))
     return objs
 
 
@@ -1355,7 +1436,7 @@ def wifi_network():
     objs = header("Studio-5G", "wifi_network", size=title_size("Studio-5G"))
     objs += info_card(SUB_CONTENT_Y, [("Signal", "Strong", "network_signal"), ("Security", "WPA2", "network_security"),
                                       ("IP address", IP_ADDRESS, "network_ip")], "network_card")
-    objs.append(label(24, 304, 432, "Ideas lose Wi-Fi until you reconnect.", "sans", 16, TEXT2, "center"))
+    objs.append(label(24, 304, 432, "After forgetting, Ideas stay offline until you reconnect.", "sans", 16, TEXT2, "center"))
     objs += danger(344, "Hold to forget", "hold:forget", "button_forget", "wifi_off")
     return objs
 
@@ -1432,7 +1513,7 @@ def shared_entry(entry=None):
 
 SHARED_HELP = ("Shared info is a short list of keys and values kept on this device. Every Idea "
                "can read it, so you only enter things like your city or an API key once.")
-SHARED_EXAMPLES = [("city", "Weather Station"), ("api_key", "AI Chat")]
+SHARED_EXAMPLES = [("city", "Weather"), ("api_key", "Skills")]
 
 
 def shared_help():
@@ -1477,7 +1558,7 @@ def build_states():
     add("manage-updating", "manage", "Manage · updating", manage(updating=True))
     add("manage-swipe", "manage", "Manage · swiped to delete", manage(swipe=1))
     add("manage-undo", "manage", "Manage · deleted, Undo",
-        manage(ideas=[i for i in PRESETS if i["id"] != "100002"], undo="Lo-fi Clock"))
+        manage(ideas=[i for i in PRESETS if i["id"] != "100002"], undo="Clock"))
     add("manage-uptodate", "manage", "Manage · up to date", manage(updates=False))
     for mode, title in (("local", "on this device"), ("update", "update available"),
                         ("remote", "from the store"), ("nospace", "not enough space"),
@@ -1509,6 +1590,7 @@ def build_states():
     add("settings-ai-key", "settings", "Settings · AI pressed (back)", settings() + ai_feedback("Back"))
     add("display", "display", "Display · screen off and auto-rotate", display_page())
     add("display-never", "display", "Display · never off, rotation locked", display_page(0, False))
+    add("language", "language", "Language", language_page())
     add("wifi", "wifi", "Wi-Fi · connected", wifi())
     add("wifi-off", "wifi", "Wi-Fi · not connected", wifi("off"))
     add("wifi-pending", "wifi", "Wi-Fi · resumes a task", wifi("off", "Connect to look up 238114"))
@@ -1556,7 +1638,7 @@ def prototype_extras():
         "shared_row": relative(shared_row(0, SHARED_SAMPLE[0], vp), 16, 0),
         "swipe_action": relative(swipe_action(0, vp, "row"), 16, 0),
         "toast": toast("Saved"),
-        "toast_undo": toast("Deleted Lo-fi Clock", undo=True),
+        "toast_undo": toast("Deleted Clock", undo=True),
         "confirm": confirm_open(BY_ID["100002"]),
         "confirm_check": [o for o in confirm_open(BY_ID["100002"], checked=True)
                           if (o.get("name") or "").startswith("confirm_skip")],
@@ -1574,7 +1656,7 @@ def rgb(color: str):
 
 
 def draw_text(img, draw, obj, text, box, color, align="left", offset=0.0):
-    f = font_for(obj["font"], obj["size"])
+    f = font_for(obj["font"], obj["size"], text)
     x, y, w, h = box
     lh = LINE_EM[obj["font"]] * obj["size"]
     if obj.get("wrap"):
@@ -1611,9 +1693,9 @@ def keyboard_keys(kb):
     keys.append((416, ky, 56, key_h, "del", kb["function_color"], None))
     ky = y0 + 4 + 3 * pitch
     keys.append((16, ky, 80, key_h, "123", kb["function_color"], kb["fg_color"]))
-    keys.append((104, ky, 272, key_h, "space", kb["key_color"], kb["fg_color"]))
+    keys.append((104, ky, 272, key_h, kb.get("space_label", "space"), kb["key_color"], kb["fg_color"]))
     go = kb.get("go_enabled")
-    keys.append((384, ky, 80, key_h, "GO", kb["ok_color"] if go else kb["ok_disabled_color"],
+    keys.append((384, ky, 80, key_h, kb.get("go_label", "GO"), kb["ok_color"] if go else kb["ok_disabled_color"],
                  kb["ok_text_color"] if go else kb["ok_disabled_text_color"]))
     return keys
 
@@ -1631,6 +1713,7 @@ def draw_keyboard(img, draw, kb):
             img.paste(bs, (int(kx) + 14, int(ky) + 11), bs)
         else:
             face, size = (ff, kb["function_font_size"]) if tcolor else (f, kb["font_size"])
+            face = font_for(kb["font"], size, text)
             tw = face.getlength(text)
             draw.text((kx + (kw - tw) / 2, ky + (kh - 1.25 * size) / 2), text, font=face,
                       fill=rgb(tcolor or kb["fg_color"]))
@@ -1885,15 +1968,15 @@ TOASTS = [
     "Screen off after 10 min", "Screen stays on", "Auto-rotate on", "Auto-rotate off",
 ]
 DOWNLOAD_ERRORS = [
-    "Type the 6-digit ID", "Type all 6 digits", "No Idea with this ID", "This Idea was removed", "Not for this device",
+    "Enter the 6-digit ID from Mosaico Ideas", "Type all 6 digits", "No Idea with this ID", "This Idea was removed", "Not for this device",
     "Download not allowed", "Store is busy. Try later.", "Can't reach the store", "Not enough storage",
 ]
 ROW_SUBS = [  # second line of a list row (312 px; 280 px next to a lock icon)
     "v10.12.3 · 312.4 MB", "Update to v10.13.0", "Updating · 100%", "Waiting", "Paused · no Wi-Fi", "Current",
     "Connected · 192.168.100.200", "Scan for the step-by-step guide", "Publish it on Mosaico Ideas",
-    "New version on Mosaico Ideas", "Guides and QR codes", "12 entries", "hello_world · keep it for later",
+    "New version on Mosaico Ideas", "How-to guides and fixes", "12 entries", "hello_world · keep it for later",
     "Install an Idea over USB first", "hello_world is saved", "Screen off after 10 min", "Screen stays on",
-    "Turns with the device (IMU)", "Locked in this orientation",
+    "Follows how you hold it", "Stays in this orientation",
     *[t[5] for t in HELP_TOPICS], "sk-demo-4c8e9a12b3", "••••••••",
 ]
 COPY = [
@@ -1909,14 +1992,14 @@ COPY = [
     (432, "medium", 28, [r[1] for r in RESULTS.values()] + ["Idea updated"]),
     (432, "sans", 18, ["Opening in 1 s", "Connect Wi-Fi to download Ideas."]),
     (340, "sans", 16, ["Not connected", "Connecting…", "Pick a network below", "Connect to look up 238114",
-                       "Connect to update Voice Notes", "Connect to get updates"]),
+                       "Connect to update Typhoon Monitor", "Connect to get updates"]),
     (312, "sans", 16, ROW_SUBS),
     (280, "sans", 16, ["Secured · Strong", "Open · Good", "Secured · Weak"]),
     (416, "sans", 16, ["a–z, 0–9 and _ · up to 15 characters", "Value for city · up to 256 characters",
                        "Ideas that use city need the new name", "Key already used", "Type a key first",
                        "Type a value first", "Use 8 or more characters", "Max 256 characters",
                        "Use a–z, 0–9 and _ only"]),
-    (432, "sans", 16, ["Ideas lose Wi-Fi until you reconnect.", "To come back: hold AI, press power twice.",
+    (432, "sans", 16, ["After forgetting, Ideas stay offline until you reconnect.", "To come back: hold AI, press power twice.",
                        "Ideas read it as shared/abcdefghijklmno"]),
     (326, "sans", 16, ["USB connected · Waiting for agent", "USB connected · Agent ready", "Plug in a USB cable"]),
     (360, "sans", 16, ["Vibe Mode closes while it runs.", "Unsaved hello_world will be replaced."]),
@@ -1929,6 +2012,7 @@ def check_copy() -> list[str]:
     problems = []
     for width, font, size, texts in COPY:
         for text in texts:
+            text = loc(text)
             w = text_width(text, font, size)
             if w > width:
                 problems.append(f"copy {text!r} is {w:.0f} px wide in a {width} px label")
@@ -1941,6 +2025,33 @@ def check_copy() -> list[str]:
     if wrap_lines(SHARED_HELP, "sans", 18, 432, 4)[1]:
         problems.append("shared info explanation needs more than four lines")
     return problems
+
+
+# Words that stay in English inside the Chinese UI (product terms, units, protocol names).
+KEEP_LATIN = {"Vibe", "Mode", "Mosaico", "Ideas", "Idea", "AI", "Agent", "Wi-Fi", "USB", "NAND", "IMU", "Boot",
+              "MB", "KB", "MAC", "ID", "IP", "WPA", "API", "English", "Coding", "GO", "ABC", "s"}
+
+
+def check_untranslated(states, templates) -> list[str]:
+    """Chinese build: every visible string must be Chinese apart from names and kept terms."""
+    names = {i["name"] for i in PRESETS + STORE_ONLY} | {"hello_world", PRODUCT}
+    names |= {n[0] for n in NETWORKS} | {e["key"] for e in SHARED_SAMPLE} | {e["value"] for e in SHARED_SAMPLE}
+    names |= set(QR_URLS.values()) | {i["url"].replace("https://", "") for i in PRESETS + STORE_ONLY}
+    problems = []
+    objs = [(st["id"], o) for st in states for o in st["objects"]]
+    objs += [(f"template {k}", o) for k, v in templates.items() for o in v]
+    for where, o in objs:
+        text = o.get("text") or ""
+        if not text.strip() or o["type"] not in ("label", "button"):
+            continue
+        rest = re.sub(r"https?://\S+|[\w.-]+\.(com|cn)/?\s*[\w/.-]*|shared/\w+", " ", text)
+        for n in sorted(names, key=len, reverse=True):
+            rest = rest.replace(n, " ")
+        rest = re.sub(r"v\d[\w.]*|([0-9A-F]{2}:){5}[0-9A-F]{2}|\b[a-z]–[a-z]\b|\d[\d.:]*", " ", rest)
+        words = [w for w in re.findall(r"[A-Za-z][A-Za-z\-]*", rest) if w not in KEEP_LATIN]
+        if words:
+            problems.append(f"zh {where}: untranslated {text!r}")
+    return sorted(set(problems))
 
 
 def check_templates(templates) -> list[str]:
@@ -1968,11 +2079,9 @@ def check_store_text() -> list[str]:
             problems.append(f"name of {iid} is longer than 24 characters")
         if wrap_lines(idea["name"], "medium", 18, 144, 2)[1]:
             problems.append(f"name of {iid} needs more than two lines in the Ideas grid")
-        if idea["glyph"] not in GLYPHS:
-            problems.append(f"{iid} uses unknown glyph {idea['glyph']!r}")
         for size in (56, 96, 108):
-            if not (DESIGN / f"assets/mosaic/idea_{idea['glyph']}-{size}.png").exists():
-                problems.append(f"{iid} is missing idea_{idea['glyph']}-{size}.png")
+            if not (DESIGN / f"assets/ideas/{idea['icon']}-{size}.png").exists():
+                problems.append(f"{iid} is missing its icon {idea['icon']}-{size}.png")
         if not (DESIGN / f"assets/qr/idea-{iid}.png").exists():
             problems.append(f"{iid} is missing its QR code")
     return problems
@@ -2047,10 +2156,8 @@ def networks_json():
     return [{"ssid": s, "secured": sec, "signal": sig} for s, sec, sig in NETWORKS]
 
 
-def main() -> int:
-    states = build_states()
-    out = DESIGN / "mockups"
-    out.mkdir(exist_ok=True)
+def render_all(states, out: Path) -> None:
+    out.mkdir(parents=True, exist_ok=True)
     for stale in out.glob("*.png"):
         stale.unlink()
     renders = {st["id"]: render(st) for st in states}
@@ -2072,10 +2179,68 @@ def main() -> int:
         sheet.paste(small, (cx, cy), small)
         d.text((cx, cy + ch + 6), st["title"], font=cf, fill=rgb(TEXT2))
     sheet.save(out / "00-overview.png", optimize=True)
+
+
+_CJK_PUNCT = set("，。、：；？！）」』…·「『（ ")
+
+
+def cjk_line_problems(text: str, font: str, size: int, width: float, align: str = "left") -> list[str]:
+    """Chinese line breaks. A last line of one or two characters reads as a slip; a line
+    wider than its box gets re-broken by the browser; a key name such as "AI 键" must not
+    be split; and in left-aligned copy a hand break that leaves a short line looks cut
+    off. Write such copy as one flowing line, or break at a comma where the first line
+    is nearly full."""
+    if not has_cjk(text):
+        return []
+    paras = text.split("\n")
+    lines = [l for para in paras for l in (wrap_lines(para, font, size, width, 99)[0] or [""])]
+    out = [f"line wider than {width:.0f} px: “{l}”" for l in lines if text_width(l, font, size) > width + 0.5]
+    if len(lines) > 1 and len([c for c in lines[-1] if c not in _CJK_PUNCT]) <= 2:
+        out.append(f"last line is only “{lines[-1]}”")
+    out += [f"splits the key name “{a.split()[-1]} 键”" for a, b in zip(lines, lines[1:]) if b.startswith("键") and a.strip()]
+    if align == "left":
+        out += [f"short hand-broken line “{p}”" for p in paras[:-1] if text_width(p, font, size) < 0.75 * width]
+    return out
+
+
+def check_cjk_lines(states, templates) -> list[str]:
+    problems = []
+    objs = [(st["id"], o) for st in states for o in st["objects"]]
+    objs += [(f"template {k}", o) for k, v in templates.items() for o in v]
+    for where, o in objs:
+        if o["type"] == "label" and o.get("overflow") != "ellipsis" and o.get("text"):
+            problems += [f"{where}/{o.get('name')}: {p}"
+                         for p in cjk_line_problems(o["text"], o["font"], o["size"], o["w"], o.get("align", "left"))]
+    for idea in PRESETS + STORE_ONLY:
+        problems += [f"summary of {idea['id']}: {p}" for p in cjk_line_problems(loc(idea["summary"]), "sans", 18, 432)]
+    for key, steps in HELP_TOPIC_STEPS.items():
+        for n, step in enumerate(steps, 1):
+            problems += [f"help {key} step {n}: {p}" for p in cjk_line_problems(loc(step), "sans", 18, HELP_STEP_W)]
+    return problems
+
+
+def build_locale(lang: str):
+    set_lang(lang)
+    states = build_states()
     extras, templates = prototype_extras()
-    layout = {"schema": "vibe-mode-design/10", "screen": {"w": W, "h": H}, "tokens": TOKENS,
+    problems = check(states, extras) + check_templates(templates)
+    if lang == "zh":
+        problems += check_untranslated(states, templates) + check_cjk_lines(states, templates)
+    return states, extras, templates, [f"[{lang}] {p}" for p in problems]
+
+
+def main() -> int:
+    zh_states, zh_extras, zh_templates, zh_problems = build_locale("zh")
+    render_all(zh_states, DESIGN / "mockups/zh")
+    states, extras, templates, problems = build_locale("en")   # English last: it is the source
+    render_all(states, DESIGN / "mockups")
+    problems += zh_problems
+    layout = {"schema": "vibe-mode-design/11", "screen": {"w": W, "h": H}, "tokens": TOKENS,
               "states": states,
+              "locales": {"zh": {"name": LANGS["zh"], "states": zh_states}},
               "prototype": {"states": extras, "row_templates": templates,
+                            "locales": {"zh": {"states": zh_extras, "row_templates": zh_templates}},
+                            "i18n": {"zh": ZH, "category_zh": CATEGORY_ZH, "langs": LANGS},
                             "row_heights": {"manage": ROW_PITCH, "networks": ROW_PITCH, "shared": ROW_PITCH,
                                             "settings": ROW_PITCH},
                             "categories": [{"id": k, "label": t, "icon": i} for k, t, i in CATEGORIES],
@@ -2085,7 +2250,8 @@ def main() -> int:
                             "networks": networks_json(), "qr_urls": QR_URLS,
                             "qr_info": {k: {"title": t, "desc": d} for k, (t, d) in QR_INFO.items()},
                             "idea_qr_text": IDEA_QR_TEXT,
-                            "help_topics": [{"key": k, "title": t, "qr": q} for k, t, q, *_ in HELP_TOPICS],
+                            "help_topics": [{"key": k, "title": t, "qr": q, "steps": HELP_TOPIC_STEPS[k]}
+                                            for k, t, q, *_ in HELP_TOPICS],
                             "settings_rows": [{"icon": i, "title": t, "sub": sub, "go": g, "button": b, "sub_name": n}
                                               for i, t, sub, g, b, n in SETTINGS_ROWS],
                             "screen_off": [{"label": t, "s": v} for t, v in SCREEN_OFF],
@@ -2107,12 +2273,11 @@ def main() -> int:
     (DESIGN / "layout.json").write_text(json.dumps(layout, indent=1, ensure_ascii=False) + "\n",
                                         encoding="utf-8")
     (DESIGN / "layout-tables.md").write_text(layout_tables(states), encoding="utf-8")
-    problems = check(states, extras) + check_templates(templates)
     for p in problems:
         print("check:", p)
-    for name in unused_images(states, extras, templates):
+    for name in unused_images(states + zh_states, extras + zh_extras, {**templates, **zh_templates}):
         print("note: unused image", name)
-    print(f"{len(states)} states rendered; {len(problems)} layout issues")
+    print(f"{len(states)} states × 2 languages rendered; {len(problems)} layout issues")
     return 1 if problems and "--strict" in sys.argv else 0
 
 

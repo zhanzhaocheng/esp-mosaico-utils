@@ -1,4 +1,4 @@
-// Playwright smoke coverage for the Vibe Mode v10 single-file prototype.
+// Playwright smoke coverage for the Vibe Mode v11 single-file prototype.
 // Usage: node tools/prototype_smoke.js [screenshot-dir]
 // Set PLAYWRIGHT_MODULE if Playwright is installed outside this directory.
 const path = require('path');
@@ -99,7 +99,7 @@ const check = (condition, message) => {
   check(await page.locator('.thumb').count() === stateCount && stateCount > 0, `gallery lists all ${stateCount} design states`);
   const tokens = await mdl(() => ({ r: T.screen.corner_radius, touch: T.min_touch, hold: I.danger_hold_ms, undo: I.undo_ms, schema: LAYOUT.schema }));
   check(tokens.r === 60 && tokens.touch === 84 && tokens.hold === 3000 && tokens.undo === 4000, 'R60, 84 px touch, 3 s hold and 4 s Undo tokens');
-  check(tokens.schema === 'vibe-mode-design/10', 'layout schema is vibe-mode-design/10');
+  check(tokens.schema === 'vibe-mode-design/11', 'layout schema is vibe-mode-design/11');
 
   // 2. Home: quiet status bar, pager dots, hero animation, first-use hint.
   check(await view() === 'home' && await text('nav_badge') === '', 'home has no update badge in the status bar');
@@ -131,11 +131,33 @@ const check = (condition, message) => {
   await page.waitForTimeout(2100);
   check((await text('nav_badge')) === '', 'the page name clears after a moment');
   check(await has('idea_ring_100001') && await has('idea_badge_100006'), 'current Idea has a ring and updatable Ideas a badge');
+  check(await brokenImgs() === 0 && await loc('idea_icon_100001').getAttribute('src') === await mdl(() => ASSETS['assets/ideas/pet-talk-108.png']), 'Idea tiles use the Mosaico launcher icons');
   await shot('02-ideas-1');
   await drag(100, 130, 400, 130, 8, 520);
   check(await view() === 'home' && await text('nav_badge') === 'Home' && !(await has('pager_hint')), 'swipe right returns Home; the hint is gone for good');
   await drag(120, 130, 150, 130, 6, 480);
   check(await view() === 'home', 'a short swipe snaps back to Home');
+  {
+    // Regressions: releasing outside the screen, and a second swipe while the first still slides.
+    const sb = await screenBox(), k = sb.width / 480;
+    const contents = () => mdl(() => pageLayer.querySelectorAll(':scope > .pager-content').length);
+    await page.mouse.move(sb.x + 400 * k, sb.y + 200 * k);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(sb.x + (400 - 50 * i) * k, sb.y + 200 * k);
+    await page.mouse.up();
+    await settle(500);
+    check(await contents() === 1 && await mdl(() => !gst && model.page === 1), 'releasing a swipe outside the screen still finishes it cleanly');
+    for (let n = 0; n < 2; n++) {
+      await page.mouse.move(sb.x + 420 * k, sb.y + 200 * k);
+      await page.mouse.down();
+      for (let i = 1; i <= 5; i++) await page.mouse.move(sb.x + (420 - 60 * i) * k, sb.y + 200 * k);
+      await page.mouse.up();
+      await settle(60);
+    }
+    await settle(500);
+    check(await contents() === 1 && await mdl(() => model.page) === 3, 'two quick swipes leave exactly one page on screen');
+    await tap('pager_hit_0', 520);
+  }
   await tap('pager_hit_2', 520);
   check(await view() === 'ideas' && await mdl(() => cur().params.page) === 2, 'tapping the third dot opens Ideas page 2');
   await tap('pager_hit_4', 520);
@@ -178,7 +200,7 @@ const check = (condition, message) => {
   // 5. Tapping an Idea asks first; then launching and running.
   await tap('pager_hit_1', 520);
   await tap('button_idea_100001', 300);
-  check(await view() === 'ideas' && await text('confirm_title') === 'Open Pixel Pet?' && await text('confirm_key_ai_chip') === 'Hold AI' && await text('confirm_key_power_chip') === 'Press twice', 'tapping an Idea opens a confirm dialog with arrows at the AI and power keys');
+  check(await view() === 'ideas' && await text('confirm_title') === 'Open Pet Talk?' && await text('confirm_key_ai_chip') === 'Hold AI' && await text('confirm_key_power_chip') === 'Press twice', 'tapping an Idea opens a confirm dialog with arrows at the AI and power keys');
   {
     const sb = await screenBox(), k = sb.width / 480;
     const up = await loc('confirm_key_ai_arrow').boundingBox(), down = await loc('confirm_key_power_arrow').boundingBox();
@@ -191,7 +213,7 @@ const check = (condition, message) => {
   await ai();
   check(!(await page.locator('#screen .modal-layer.show').count()) && await view() === 'ideas', 'AI closes the dialog too');
   await openTile('100001', 300);
-  check(await view() === 'launching' && (await text('launch_title')).includes('Pixel Pet'), 'Open goes to Launching');
+  check(await view() === 'launching' && (await text('launch_title')).includes('Pet Talk'), 'Open goes to Launching');
   await page.waitForTimeout(1700);
   check(await view() === 'running', 'current Idea ends in Running');
   await blur();
@@ -222,10 +244,10 @@ const check = (condition, message) => {
   await toManage();
   let labels = await rowLabels('manage');
   check(await view() === 'manage' && labels.length === 20, 'Manage lists 20 Ideas');
-  check(labels[0] === 'Pixel Pet' && labels[1] === 'Voice Notes' && labels[2] === 'Weather Station', 'current Idea first, then the ones with updates');
+  check(labels[0] === 'Pet Talk' && labels[1] === 'Agenda' && labels[2] === 'Weather', 'current Idea first, then the ones with updates');
   check((await text('manage_summary')).startsWith('20 Ideas'), 'Manage shows the count and storage use');
   check(await text('button_update_all_badge') === '2' && !(await has('update_all_sub')), 'updates are a header button with a count, not a row');
-  check(await mdl(() => named(STATES.manage.objects, 'button_update_all_icon').image.includes('upgrade')), 'the update button uses the upward upgrade icon');
+  check(await mdl(() => named(STATES_BY.en.manage.objects, 'button_update_all_icon').image.includes('upgrade')), 'the update button uses the upward upgrade icon');
   check(await loc('manage_scroll_thumb').isVisible(), 'the list shows a scrollbar');
   const t0 = await loc('manage_scroll_thumb').evaluate((el) => el.offsetTop);
   await page.evaluate(() => { const l = document.querySelector('#screen [data-list="manage"]'); l.scrollTop = 600; l.dispatchEvent(new Event('scroll')); });
@@ -235,7 +257,7 @@ const check = (condition, message) => {
   await shot('04-manage');
   await tap('button_update_all', 360);
   check(await has('button_update_all_spinner'), 'the update button spins while updating');
-  check((await rowLabels('manage'))[1] === 'Voice Notes', 'updating rows stay in place');
+  check((await rowLabels('manage'))[1] === 'Agenda', 'updating rows stay in place');
   await shot('05-manage-updating');
   await page.waitForFunction(() => !model.bg, null, { timeout: 12000 });
   await settle(200);
@@ -253,12 +275,12 @@ const check = (condition, message) => {
   await openDelete().click();
   await settle(360);
   labels = await rowLabels('manage');
-  check(labels.length === 19 && !labels.includes('Lo-fi Clock'), 'Delete removes the Idea at once');
-  check(await text('toast_text') === 'Deleted Lo-fi Clock' && await has('button_undo'), 'the toast offers Undo');
+  check(labels.length === 19 && !labels.includes('Clock'), 'Delete removes the Idea at once');
+  check(await text('toast_text') === 'Deleted Clock' && await has('button_undo'), 'the toast offers Undo');
   await shot('07-manage-undo');
   await tap('button_undo', 360);
   labels = await rowLabels('manage');
-  check(labels.length === 20 && labels[3] === 'Lo-fi Clock', 'Undo puts it back in the same place');
+  check(labels.length === 20 && labels[3] === 'Clock', 'Undo puts it back in the same place');
   await swipeRow('manage', 0);
   check(await page.locator('#screen .swipe-row.open').count() === 0 && await text('toast_text') === "Can't delete the current Idea", 'the current Idea bounces back with a reason');
   await swipeRow('manage', 1);
@@ -271,7 +293,7 @@ const check = (condition, message) => {
   await toManage();
   await rows('manage').nth(3).click();
   await settle();
-  check(await view() === 'idea_info' && await text('info_title') === 'Lo-fi Clock', 'Manage row opens Idea info');
+  check(await view() === 'idea_info' && await text('info_title') === 'Clock', 'Manage row opens Idea info');
   check(await has('button_open') && await has('button_delete') && !(await has('button_rename')), 'Open and Delete sit side by side; no Rename');
   await tap('button_qr_idea', 420);
   check(await view() === 'qr' && await has('qr_code') && (await text('qr_desc')).length > 20 && await has('button_back_qr'), 'QR page explains the code and has Back');
@@ -294,7 +316,7 @@ const check = (condition, message) => {
     check(await view() === 'idea_info' && await text('toast_text') === 'Not deleted' && !(await has('delete_popup_title')), 'letting go early cancels');
   }
   await hold('button_delete', 3300);
-  check(await view() === 'manage' && (await rowLabels('manage')).length === 19 && await text('toast_text') === 'Deleted Lo-fi Clock', 'a full 3 s hold deletes and returns to Manage');
+  check(await view() === 'manage' && (await rowLabels('manage')).length === 19 && await text('toast_text') === 'Deleted Clock', 'a full 3 s hold deletes and returns to Manage');
   await tap('button_undo', 360);
   check((await rowLabels('manage')).length === 20, 'Undo restores it');
   await rows('manage').nth(0).click();
@@ -335,7 +357,7 @@ const check = (condition, message) => {
   check(await slots() === '238', 'tapping keys fills the slots');
   await typeKeys('114');
   await tap('key_go', 1300);
-  check(await view() === 'idea_info' && await text('info_title') === 'Retro Snake' && await has('button_download'), 'lookup opens the store Idea with Download');
+  check(await view() === 'idea_info' && await text('info_title') === 'Rolling Maze' && await has('button_download'), 'lookup opens the store Idea with Download');
   await tap('button_download', 400);
   check(await view() === 'progress' && await has('button_cancel'), 'Download shows progress with Cancel');
   await tap('button_cancel', 420);
@@ -452,7 +474,7 @@ const check = (condition, message) => {
   await settle(300);
   check(await view() === 'password' && (await text('password_note')).includes('Connecting'), 'password page shows Connecting');
   await page.waitForTimeout(3300);
-  check(await view() === 'idea_info' && await text('info_title') === 'Retro Snake', 'lookup resumes after connecting');
+  check(await view() === 'idea_info' && await text('info_title') === 'Rolling Maze', 'lookup resumes after connecting');
   await reset();
 
   // 13. Low battery blocks switching.
@@ -470,7 +492,7 @@ const check = (condition, message) => {
   await tap('button_help_ids', 420);
   check(await view() === 'help_topic' && await text('help_topic_title') === 'Idea IDs & sharing', 'Help topic opens');
   await tap('button_help_qr', 420);
-  check(await view() === 'qr' && await text('qr_title') === 'Idea IDs & sharing' && await has('qr_url'), 'Show QR code opens the QR page');
+  check(await view() === 'qr' && await text('qr_title') === 'Idea IDs & sharing' && await has('qr_url'), 'Full guide on your phone opens the QR page');
   await ai(); await ai(); await ai();
   await tap('button_about', 420);
   check(await view() === 'about' && (await text('about_version')) === 'v1.2' && (await text('about_storage')).startsWith('32.8'), 'About shows version and storage');
@@ -512,7 +534,7 @@ const check = (condition, message) => {
   await panel('simIdle', 300);
   check(await mdl(() => !model.sleeping), 'Never keeps the screen on');
   await tap('button_rotate', 300);
-  check(await mdl(() => !model.autoRotate) && (await text('display_rotate_sub')).startsWith('Locked'), 'Auto-rotate switches off');
+  check(await mdl(() => !model.autoRotate) && (await text('display_rotate_sub')) === 'Stays in this orientation', 'Auto-rotate switches off');
   await reset();
 
   // 16. IMU rotation: the device turns, the UI stays upright; it waits on keyboard pages.
@@ -588,6 +610,112 @@ const check = (condition, message) => {
   check(await view() === 'result' && await mdl(() => !!ideaById('900001')), 'saved: the Idea is now in NAND');
   await tap('button_result_left', 420);
   check((await text('develop_save_sub')) === 'hello_world is saved', 'Develop shows it is saved');
+  await reset();
+
+
+  // 19. Language: Settings → Language turns every page Chinese at once and survives a reload.
+  // Idea names, SSIDs, URLs and shared data are content and stay as they are.
+  const englishLeft = () => page.evaluate(() => {
+    const keep = new Set(['Vibe', 'Mode', 'Mosaico', 'Ideas', 'Idea', 'AI', 'Agent', 'Wi-Fi', 'USB', 'NAND', 'IMU', 'Boot',
+      'MB', 'KB', 'MAC', 'ID', 'IP', 'WPA', 'WPA2', 'API', 'English', 'Coding', 'ABC', 's']);
+    const content = [...model.ideas.map((a) => a.name), ...Object.values(STORE).map((a) => a.name), ...NETS.map((n) => n.ssid),
+      ...nvs.flatMap((e) => [e.key, e.value]), 'hello_world'].filter(Boolean).sort((a, b) => b.length - a.length);
+    const shown = (el) => { for (let e = el; e && e !== screen; e = e.parentElement) {
+      const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false; }
+      return true; };
+    const out = [];
+    for (const el of screen.querySelectorAll('span, .kb-key, .chip')) {
+      if (el.children.length || !shown(el)) continue;
+      const key = el.closest('.kb-key');
+      if (key && !['kb: ', 'kb:go'].includes(key.dataset.key)) continue;
+      let t = el.textContent.replace(/\/\n/g, '/').replace(/\b[a-z]–[a-z]\b/g, ' ');
+      t = t.replace(/https?:\/\/\S+|[\w-]+(\.[\w-]+)+(\/\S*)?|shared\/\w+/g, ' ');
+      for (const n of content) t = t.split(n).join(' ');
+      t = t.replace(/v?\d[\w.:-]*/g, ' ');
+      for (const w of t.match(/[A-Za-z][A-Za-z'’-]*/g) || []) if (!keep.has(w)) out.push(`${w} ← “${el.textContent.trim()}”`);
+    }
+    return [...new Set(out)];
+  });
+  const cut = () => page.evaluate(() => [...screen.querySelectorAll('span')].filter((s) => !s.children.length
+    && /[\u3000-\u9fff]/.test(s.textContent) && (s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 2)
+    && (getComputedStyle(s).textOverflow === 'ellipsis' || getComputedStyle(s).webkitLineClamp !== 'none')).map((s) => s.textContent));
+  const zhIssues = [];
+  const audit = async (where) => {
+    for (const w of await englishLeft()) zhIssues.push(`${where}: English ${w}`);
+    for (const c of await cut()) zhIssues.push(`${where}: cut off “${c}”`);
+  };
+  await tap('button_settings');
+  check((await text('settings_language')) === 'English', 'Settings shows the current language');
+  await tap('button_language');
+  check(await view() === 'language', 'the Language page opens');
+  await tap('button_lang_zh', 420);
+  check(await mdl(() => LANG) === 'zh' && (await text('language_title')) === '语言', 'choosing 简体中文 switches right away');
+  check((await text('toast_text')) === '已切换为简体中文', 'the confirmation is in Chinese');
+  check(await page.locator('.thumb').count() === stateCount && (await page.locator('.thumb span').first().textContent()).length > 0,
+    'the gallery shows the Chinese states');
+  await shot('40-zh-language');
+  await audit('language');
+  await ai(420, 700);
+  check((await page.locator('#screen [data-name="settings_title"]').first().textContent()) === '设置' && (await text('settings_language')) === '简体中文', 'Settings is Chinese and lists 简体中文');
+  await audit('settings');
+  await shot('41-zh-settings');
+  for (const [btn, name] of [['button_wifi', 'wifi'], ['button_display', 'display'], ['button_shared', 'shared'], ['button_about', 'about']]) {
+    await tap(btn, 420); await audit(name); await shot(`42-zh-${name}`); await ai();
+  }
+  await tap('button_wifi', 420);
+  await tap('button_wifi_current', 420); await audit('wifi network');
+  await ai();
+  await rows('networks').first().click(); await settle(420); await audit('password');
+  check((await page.locator('#screen .kb-key[data-key="kb: "]').last().textContent()) === '空格'
+    && (await page.locator('#screen .kb-key[data-key="kb:go"]').last().textContent()) === '确定', 'keyboard space and GO keys are Chinese');
+  await shot('43-zh-password');
+  await ai(); await ai();
+  await tap('button_shared', 420);
+  await tap('button_shared_help', 420); await audit('shared help'); await ai();
+  await rows('shared').first().click(); await settle(420); await audit('shared entry'); await shot('44-zh-shared-entry'); await ai();
+  await tap('button_add_entry', 420); await audit('shared add'); await ai(); await ai();
+  await tap('button_help', 420); await audit('help');
+  for (const k of ['start', 'develop', 'ids', 'fix']) {
+    await tap(`button_help_${k}`, 420); await audit(`help ${k}`); await shot(`45-zh-help-${k}`);
+    if (k === 'start') { await tap('button_help_qr', 420); await audit('qr'); await shot('46-zh-qr'); await ai(); }
+    await ai();
+  }
+  await ai(); await ai();
+  check(await view() === 'home' && (await text('home_title_b')).includes('跑起来'), 'Home is Chinese');
+  await audit('home'); await shot('47-zh-home');
+  await tap('button_develop', 420); await audit('develop'); await shot('48-zh-develop'); await ai();
+  await toManage(); await audit('manage'); await shot('49-zh-manage');
+  await rows('manage').nth(1).click(); await settle(420); await audit('idea info (update)'); await shot('50-zh-info');
+  {
+    const c = await center('button_delete');
+    await page.mouse.move(c.x, c.y); await page.mouse.down(); await page.waitForTimeout(1300);
+    await audit('delete hold'); await shot('51-zh-deleting');
+    await page.mouse.up(); await settle(420);
+    check((await text('toast_text')) === '未删除', 'letting go early says 未删除');
+  }
+  await ai();
+  await tap('button_add_download', 420); await audit('download');
+  await typeKeys('404040'); await tap('key_go', 1800); await audit('download error'); await shot('52-zh-download-error');
+  check(/[\u4e00-\u9fff]/.test(await text('id_status')) && (await text('id_status')) !== '输入 Mosaico Ideas 上的 6 位编号', 'lookup errors are Chinese');
+  await ai(); await ai();
+  await tap('pager_hit_1', 520); await audit('ideas page');
+  check((await text('nav_badge')) === 'Idea 1/4', 'the page badge names the Ideas page');
+  await tap('button_idea_100002', 300); await audit('confirm'); await shot('53-zh-confirm');
+  await tap('button_confirm_open', 500); await audit('switching'); await shot('54-zh-switching');
+  await page.waitForTimeout(4200); await audit(`after switch (${await view()})`);
+  await reset();
+  await blur(); await page.keyboard.down('ArrowDown'); await settle(800);
+  await audit('boot tip'); await shot('55-zh-boot-tip');
+  await page.keyboard.up('ArrowDown'); await tap('button_boot_tip_ok', 400);
+  await ai(55, 700); await audit('sleep'); await shot('56-zh-sleep');
+  check((await page.locator('#keyFb .chip').textContent()) === '息屏', 'the AI key chip is Chinese');
+  await tap('button_wake', 500);
+  check(zhIssues.length === 0, `every Chinese page is fully translated and nothing is cut off${zhIssues.length ? ':\n    ' + zhIssues.join('\n    ') : ''}`);
+  await page.reload(); await page.waitForTimeout(500);
+  check(await mdl(() => LANG) === 'zh' && (await text('home_title_b')).includes('跑起来'), 'the language survives a reload');
+  await tap('button_settings'); await tap('button_language'); await tap('button_lang_en', 420);
+  check(await mdl(() => LANG) === 'en' && (await text('toast_text')) === 'Language: English' && (await text('language_title')) === 'Language',
+    'switching back to English works');
   await reset();
 
   check(errors.length === 0, `no script errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
